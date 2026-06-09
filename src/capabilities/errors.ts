@@ -54,7 +54,7 @@ export class LlmNotConfiguredError extends CapabilityError {
 }
 
 export class LlmFailedError extends CapabilityError {
-  constructor(public cause: unknown) {
+  constructor(public override cause: unknown) {
     super('LLM call failed');
   }
 }

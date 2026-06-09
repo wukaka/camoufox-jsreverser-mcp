@@ -1,11 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BidiDriver } from '../../../../src/drivers/bidi/BidiDriver.js';
 import { MockSocket } from './mock-socket.js';
 
 describe('BidiDriver', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
   it('pairs request id with response', async () => {
     const sock = new MockSocket();
-    const drv = new BidiDriver({ socket: sock as any });
+    const drv = new BidiDriver({ socket: sock });
     const p = drv.send('session.status', {});
     // emulate Firefox reply
     const sent = JSON.parse(sock.sent[0]!);
@@ -17,7 +19,7 @@ describe('BidiDriver', () => {
 
   it('rejects with DriverProtocolError on error response', async () => {
     const sock = new MockSocket();
-    const drv = new BidiDriver({ socket: sock as any });
+    const drv = new BidiDriver({ socket: sock });
     const p = drv.send('script.evaluate', {});
     const sent = JSON.parse(sock.sent[0]!);
     sock.receive({ type: 'error', id: sent.id, error: 'invalid argument', message: 'bad params' });
@@ -26,7 +28,7 @@ describe('BidiDriver', () => {
 
   it('emits events to handlers', () => {
     const sock = new MockSocket();
-    const drv = new BidiDriver({ socket: sock as any });
+    const drv = new BidiDriver({ socket: sock });
     const onLog = vi.fn();
     drv.on('log.entryAdded', onLog);
     sock.receive({ type: 'event', method: 'log.entryAdded', params: { text: 'hi' } });
@@ -35,7 +37,7 @@ describe('BidiDriver', () => {
 
   it('rejects all in-flight on close with DriverDisconnectedError', async () => {
     const sock = new MockSocket();
-    const drv = new BidiDriver({ socket: sock as any });
+    const drv = new BidiDriver({ socket: sock });
     const p = drv.send('session.status', {});
     sock.close();
     await expect(p).rejects.toMatchObject({ name: 'DriverDisconnectedError' });
@@ -44,10 +46,16 @@ describe('BidiDriver', () => {
   it('times out after configured ms', async () => {
     vi.useFakeTimers();
     const sock = new MockSocket();
-    const drv = new BidiDriver({ socket: sock as any, timeoutMs: 100 });
+    const drv = new BidiDriver({ socket: sock, timeoutMs: 100 });
     const p = drv.send('session.status', {});
     vi.advanceTimersByTime(150);
     await expect(p).rejects.toMatchObject({ name: 'DriverTimeoutError' });
-    vi.useRealTimers();
+  });
+
+  it('rejects send() called after close() immediately', async () => {
+    const sock = new MockSocket();
+    const drv = new BidiDriver({ socket: sock });
+    sock.close();
+    await expect(drv.send('session.status', {})).rejects.toMatchObject({ name: 'DriverDisconnectedError' });
   });
 });

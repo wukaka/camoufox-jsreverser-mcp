@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { BidiIncoming, BidiRequest, SocketLike } from './protocol.js';
 import { DriverDisconnectedError, DriverProtocolError, DriverTimeoutError } from '../errors.js';
+import { SubscriptionRegistry, Subscription } from './subscription.js';
 
 interface Pending {
   resolve: (v: unknown) => void;
@@ -18,6 +19,7 @@ export class BidiDriver extends EventEmitter {
   private socket: SocketLike;
   private nextId = 1;
   private pending = new Map<number, Pending>();
+  private subs = new SubscriptionRegistry();
   private closed = false;
   private timeoutMs: number;
 
@@ -54,6 +56,26 @@ export class BidiDriver extends EventEmitter {
 
   close(): void {
     if (!this.closed) this.socket.close();
+  }
+
+  async subscribe(events: string[], contexts?: string[]): Promise<void> {
+    await this.send('session.subscribe', { events, ...(contexts ? { contexts } : {}) });
+    this.subs.add({ events, contexts });
+  }
+
+  async unsubscribe(events: string[], contexts?: string[]): Promise<void> {
+    await this.send('session.unsubscribe', { events, ...(contexts ? { contexts } : {}) });
+    this.subs.remove(events, contexts);
+  }
+
+  listSubscriptions(): readonly Subscription[] { return this.subs.list(); }
+
+  replaySubscriptions(): Promise<void> {
+    return Promise.all(
+      this.subs.list().map(s =>
+        this.send('session.subscribe', { events: s.events, ...(s.contexts ? { contexts: s.contexts } : {}) }),
+      ),
+    ).then(() => undefined);
   }
 
   private onMessage(raw: string): void {

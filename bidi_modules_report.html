@@ -1,0 +1,315 @@
+
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; }
+.wrap { padding: 0 0 1rem; font-size: 13px; }
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.filter-bar input { flex: 1; min-width: 160px; font-size: 13px; padding: 6px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); }
+.filter-bar input:focus { outline: none; border-color: var(--color-border-primary); }
+.tag-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.ftag { font-size: 11px; padding: 3px 9px; border-radius: 4px; border: 0.5px solid var(--color-border-secondary); cursor: pointer; background: var(--color-background-secondary); color: var(--color-text-secondary); user-select: none; transition: background .15s; }
+.ftag.active { background: var(--color-background-info); color: var(--color-text-info); border-color: transparent; }
+.stats { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; }
+th { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); text-align: left; padding: 6px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); white-space: nowrap; cursor: pointer; user-select: none; }
+th:hover { color: var(--color-text-primary); }
+th .sort-icon { opacity: .4; margin-left: 3px; }
+th.sorted .sort-icon { opacity: 1; }
+td { padding: 6px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); vertical-align: middle; color: var(--color-text-primary); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--color-background-secondary); }
+.mod-name { font-weight: 500; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-primary); }
+.item-name { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-secondary); }
+.badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 1px 7px; border-radius: 3px; white-space: nowrap; }
+.b-cmd  { background: #E6F1FB; color: #185FA5; }
+.b-evt  { background: #EAF3DE; color: #3B6D11; }
+.b-type { background: #F1EFE8; color: #5F5E5A; }
+@media (prefers-color-scheme: dark) {
+  .b-cmd  { background: #0C447C; color: #B5D4F4; }
+  .b-evt  { background: #27500A; color: #C0DD97; }
+  .b-type { background: #444441; color: #D3D1C7; }
+}
+.mod-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; margin-left: 5px; vertical-align: middle; }
+.m-session  { background:#EEEDFE; color:#534AB7; }
+.m-browser  { background:#FAEEDA; color:#854F0B; }
+.m-browsing { background:#E1F5EE; color:#0F6E56; }
+.m-emul     { background:#FAECE7; color:#993C1D; }
+.m-network  { background:#E6F1FB; color:#185FA5; }
+.m-script   { background:#FBEAF0; color:#993556; }
+.m-storage  { background:#EAF3DE; color:#3B6D11; }
+.m-log      { background:#F1EFE8; color:#5F5E5A; }
+.m-input    { background:#FCEBEB; color:#A32D2D; }
+.m-webext   { background:#FAC775; color:#633806; }
+@media (prefers-color-scheme: dark) {
+  .m-session  { background:#3C3489; color:#CECBF6; }
+  .m-browser  { background:#633806; color:#FAC775; }
+  .m-browsing { background:#085041; color:#9FE1CB; }
+  .m-emul     { background:#712B13; color:#F5C4B3; }
+  .m-network  { background:#0C447C; color:#B5D4F4; }
+  .m-script   { background:#72243E; color:#F4C0D1; }
+  .m-storage  { background:#27500A; color:#C0DD97; }
+  .m-log      { background:#444441; color:#D3D1C7; }
+  .m-input    { background:#791F1F; color:#F7C1C1; }
+  .m-webext   { background:#412402; color:#FAC775; }
+}
+.desc { font-size: 12px; color: var(--color-text-secondary); }
+.empty { text-align: center; padding: 2rem; color: var(--color-text-secondary); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only" style="position:absolute;left:-9999px">WebDriver BiDi 第7节模块能力报表</h2>
+  <div class="filter-bar">
+    <input type="text" id="search" placeholder="搜索模块、命令、事件…" oninput="render()">
+    <div class="tag-filters" id="tag-filters"></div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <table>
+    <thead>
+      <tr>
+        <th onclick="sortBy('module')" id="th-module">模块 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('kind')"   id="th-kind">类型 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('name')"   id="th-name">名称 <span class="sort-icon">↕</span></th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+const MOD_CLASS = {
+  session: 'm-session', browser: 'm-browser', browsingContext: 'm-browsing',
+  emulation: 'm-emul', network: 'm-network', script: 'm-script',
+  storage: 'm-storage', log: 'm-log', input: 'm-input', webExtension: 'm-webext'
+};
+const MOD_LABEL = {
+  session: '7.1', browser: '7.2', browsingContext: '7.3',
+  emulation: '7.4', network: '7.5', script: '7.6',
+  storage: '7.7', log: '7.8', input: '7.9', webExtension: '7.10'
+};
+
+const DATA = [
+  // ── session ──────────────────────────────────────────────────────
+  {module:'session', kind:'command', name:'session.status',     desc:'查询远端就绪状态'},
+  {module:'session', kind:'command', name:'session.new',        desc:'建立新会话，协商 capabilities'},
+  {module:'session', kind:'command', name:'session.end',        desc:'结束当前会话'},
+  {module:'session', kind:'command', name:'session.subscribe',  desc:'订阅指定模块的事件'},
+  {module:'session', kind:'command', name:'session.unsubscribe',desc:'取消事件订阅'},
+  {module:'session', kind:'type',    name:'CapabilitiesRequest', desc:'会话能力请求结构'},
+  {module:'session', kind:'type',    name:'CapabilityRequest',   desc:'单项能力请求'},
+  {module:'session', kind:'type',    name:'ProxyConfiguration',  desc:'代理配置'},
+  {module:'session', kind:'type',    name:'UserPromptHandler',   desc:'弹窗处理策略'},
+  {module:'session', kind:'type',    name:'UserPromptHandlerType',desc:'弹窗处理类型枚举'},
+  {module:'session', kind:'type',    name:'Subscription',        desc:'订阅句柄'},
+  {module:'session', kind:'type',    name:'SubscribeParameters', desc:'订阅参数结构'},
+  {module:'session', kind:'type',    name:'UnsubscribeByIDRequest',     desc:'按 ID 取消订阅'},
+  {module:'session', kind:'type',    name:'UnsubscribeByAttributesRequest', desc:'按属性取消订阅'},
+
+  // ── browser ──────────────────────────────────────────────────────
+  {module:'browser', kind:'command', name:'browser.close',             desc:'关闭浏览器进程'},
+  {module:'browser', kind:'command', name:'browser.createUserContext', desc:'创建隔离的用户上下文（类 Profile）'},
+  {module:'browser', kind:'command', name:'browser.getClientWindows',  desc:'获取所有浏览器窗口信息'},
+  {module:'browser', kind:'command', name:'browser.getUserContexts',   desc:'列举所有用户上下文'},
+  {module:'browser', kind:'command', name:'browser.removeUserContext', desc:'删除指定用户上下文'},
+  {module:'browser', kind:'command', name:'browser.setClientWindowState', desc:'设置窗口状态（最大化/最小化/全屏/普通）'},
+  {module:'browser', kind:'command', name:'browser.setDownloadBehavior', desc:'配置下载行为（允许/拒绝/默认）'},
+  {module:'browser', kind:'type',    name:'ClientWindow',     desc:'浏览器窗口句柄'},
+  {module:'browser', kind:'type',    name:'ClientWindowInfo', desc:'窗口详细信息（状态、尺寸等）'},
+  {module:'browser', kind:'type',    name:'UserContext',      desc:'用户上下文句柄'},
+  {module:'browser', kind:'type',    name:'UserContextInfo',  desc:'用户上下文详细信息'},
+
+  // ── browsingContext ───────────────────────────────────────────────
+  {module:'browsingContext', kind:'command', name:'browsingContext.activate',         desc:'将指定标签页置于前台'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.captureScreenshot',desc:'截取页面截图（支持全页/裁剪）'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.close',            desc:'关闭标签页或弹窗'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.create',           desc:'打开新标签页或窗口'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.getTree',          desc:'获取浏览上下文树（含 iframe）'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.handleUserPrompt', desc:'处理 alert / confirm / prompt 弹窗'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.locateNodes',      desc:'在页面中定位 DOM 节点（CSS/XPath/文本等）'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.navigate',         desc:'导航到指定 URL，支持等待策略'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.print',            desc:'将页面生成 PDF'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.reload',           desc:'刷新页面'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.setBypassCSP',     desc:'绕过内容安全策略（CSP）'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.setViewport',      desc:'设置视口尺寸与设备像素比'},
+  {module:'browsingContext', kind:'command', name:'browsingContext.traverseHistory',  desc:'前进/后退浏览历史'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.contextCreated',   desc:'新浏览上下文被创建'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.contextDestroyed', desc:'浏览上下文被销毁'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.navigationStarted',desc:'导航开始'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.fragmentNavigated',desc:'Hash 锚点导航'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.historyUpdated',   desc:'History API 状态变更'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.domContentLoaded', desc:'DOMContentLoaded 触发'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.load',             desc:'页面 load 事件触发'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.downloadWillBegin',desc:'下载即将开始'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.downloadEnd',      desc:'下载结束'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.navigationAborted',desc:'导航被中止'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.navigationCommitted',desc:'导航已提交'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.navigationFailed', desc:'导航失败'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.userPromptClosed', desc:'弹窗已关闭'},
+  {module:'browsingContext', kind:'event',   name:'browsingContext.userPromptOpened', desc:'弹窗已打开'},
+  {module:'browsingContext', kind:'type',    name:'BrowsingContext',  desc:'浏览上下文句柄（标签页/iframe）'},
+  {module:'browsingContext', kind:'type',    name:'Info',             desc:'上下文详细信息'},
+  {module:'browsingContext', kind:'type',    name:'Locator',          desc:'节点定位器（CSS/XPath/innerText/可访问性/标签）'},
+  {module:'browsingContext', kind:'type',    name:'Navigation',       desc:'导航句柄'},
+  {module:'browsingContext', kind:'type',    name:'NavigationInfo',   desc:'导航信息结构'},
+  {module:'browsingContext', kind:'type',    name:'ReadinessState',   desc:'页面就绪状态（none/interactive/complete）'},
+  {module:'browsingContext', kind:'type',    name:'UserPromptType',   desc:'弹窗类型枚举（alert/confirm/prompt/beforeunload）'},
+
+  // ── emulation ─────────────────────────────────────────────────────
+  {module:'emulation', kind:'command', name:'emulation.setForcedColorsModeThemeOverride', desc:'覆盖强制颜色模式（Windows 高对比度）'},
+  {module:'emulation', kind:'command', name:'emulation.setGeolocationOverride',           desc:'伪造地理位置'},
+  {module:'emulation', kind:'command', name:'emulation.setLocaleOverride',                desc:'覆盖语言区域设置'},
+  {module:'emulation', kind:'command', name:'emulation.setNetworkConditions',             desc:'模拟网络条件（带宽/延迟/丢包）'},
+  {module:'emulation', kind:'command', name:'emulation.setScreenSettingsOverride',        desc:'覆盖屏幕设置（分辨率/DPR）'},
+  {module:'emulation', kind:'command', name:'emulation.setScreenOrientationOverride',     desc:'覆盖屏幕方向'},
+  {module:'emulation', kind:'command', name:'emulation.setUserAgentOverride',             desc:'覆盖 User-Agent 字符串'},
+  {module:'emulation', kind:'command', name:'emulation.setScriptingEnabled',              desc:'启用或禁用 JS 脚本执行'},
+  {module:'emulation', kind:'command', name:'emulation.setScrollbarTypeOverride',         desc:'覆盖滚动条类型'},
+  {module:'emulation', kind:'command', name:'emulation.setTimezoneOverride',              desc:'覆盖时区'},
+  {module:'emulation', kind:'command', name:'emulation.setTouchOverride',                 desc:'模拟触摸屏支持'},
+
+  // ── network ───────────────────────────────────────────────────────
+  {module:'network', kind:'command', name:'network.addDataCollector',    desc:'注册网络数据收集器（响应体等）'},
+  {module:'network', kind:'command', name:'network.addIntercept',        desc:'添加请求拦截规则（URL Pattern / 阶段）'},
+  {module:'network', kind:'command', name:'network.continueRequest',     desc:'放行被拦截的请求（可修改 URL/Header/Body）'},
+  {module:'network', kind:'command', name:'network.continueResponse',    desc:'放行被拦截的响应（可修改 Header/Body）'},
+  {module:'network', kind:'command', name:'network.continueWithAuth',    desc:'提供 HTTP Auth 凭据'},
+  {module:'network', kind:'command', name:'network.disownData',          desc:'释放已收集的响应数据引用'},
+  {module:'network', kind:'command', name:'network.failRequest',         desc:'强制使请求失败'},
+  {module:'network', kind:'command', name:'network.getData',             desc:'获取收集器采集的响应数据'},
+  {module:'network', kind:'command', name:'network.provideResponse',     desc:'完全替换响应（mock）'},
+  {module:'network', kind:'command', name:'network.removeDataCollector', desc:'移除数据收集器'},
+  {module:'network', kind:'command', name:'network.removeIntercept',     desc:'移除拦截规则'},
+  {module:'network', kind:'command', name:'network.setCacheBehavior',    desc:'控制缓存行为（默认/绕过）'},
+  {module:'network', kind:'command', name:'network.setExtraHeaders',     desc:'为所有请求附加额外 Header'},
+  {module:'network', kind:'event',   name:'network.authRequired',        desc:'HTTP 认证质询，需提供凭据'},
+  {module:'network', kind:'event',   name:'network.beforeRequestSent',   desc:'请求发出前（可拦截修改）'},
+  {module:'network', kind:'event',   name:'network.fetchError',          desc:'请求失败（网络错误）'},
+  {module:'network', kind:'event',   name:'network.responseCompleted',   desc:'响应体完整接收'},
+  {module:'network', kind:'event',   name:'network.responseStarted',     desc:'收到响应头（可拦截）'},
+  {module:'network', kind:'type',    name:'AuthChallenge',    desc:'HTTP 认证质询信息'},
+  {module:'network', kind:'type',    name:'AuthCredentials',  desc:'认证凭据（用户名/密码）'},
+  {module:'network', kind:'type',    name:'BaseParameters',   desc:'网络事件公共基础参数'},
+  {module:'network', kind:'type',    name:'BytesValue',       desc:'字节值（base64 或 string）'},
+  {module:'network', kind:'type',    name:'Collector',        desc:'数据收集器句柄'},
+  {module:'network', kind:'type',    name:'CollectorType',    desc:'收集器类型枚举'},
+  {module:'network', kind:'type',    name:'Cookie',           desc:'Cookie 完整结构'},
+  {module:'network', kind:'type',    name:'CookieHeader',     desc:'请求中的 Cookie Header'},
+  {module:'network', kind:'type',    name:'DataType',         desc:'数据类型枚举'},
+  {module:'network', kind:'type',    name:'FetchTimingInfo',  desc:'请求各阶段时序信息'},
+  {module:'network', kind:'type',    name:'Header',           desc:'HTTP Header 键值对'},
+  {module:'network', kind:'type',    name:'Initiator',        desc:'请求发起来源（脚本/解析器等）'},
+  {module:'network', kind:'type',    name:'Intercept',        desc:'拦截规则句柄'},
+  {module:'network', kind:'type',    name:'Request',          desc:'请求句柄'},
+  {module:'network', kind:'type',    name:'RequestData',      desc:'请求详细数据'},
+  {module:'network', kind:'type',    name:'ResponseContent',  desc:'响应内容（body）'},
+  {module:'network', kind:'type',    name:'ResponseData',     desc:'响应详细数据'},
+  {module:'network', kind:'type',    name:'SetCookieHeader',  desc:'Set-Cookie Header 结构'},
+  {module:'network', kind:'type',    name:'UrlPattern',       desc:'URL 匹配模式（字符串或结构化）'},
+
+  // ── script ────────────────────────────────────────────────────────
+  {module:'script', kind:'command', name:'script.addPreloadScript',    desc:'注入在每个文档创建时预加载的脚本（对应 CDP addScriptToEvaluateOnNewDocument）'},
+  {module:'script', kind:'command', name:'script.disown',              desc:'释放远端对象引用（Handle）'},
+  {module:'script', kind:'command', name:'script.callFunction',        desc:'调用指定函数，支持传递远端对象参数'},
+  {module:'script', kind:'command', name:'script.evaluate',            desc:'执行任意 JS 表达式，返回序列化结果'},
+  {module:'script', kind:'command', name:'script.getRealms',           desc:'列举当前所有 JS Realm（页面/Worker 等）'},
+  {module:'script', kind:'command', name:'script.removePreloadScript', desc:'移除预加载脚本'},
+  {module:'script', kind:'event',   name:'script.message',             desc:'页面通过 Channel 向控制端发送消息'},
+  {module:'script', kind:'event',   name:'script.realmCreated',        desc:'新 Realm 被创建（新页面/Worker）'},
+  {module:'script', kind:'event',   name:'script.realmDestroyed',      desc:'Realm 被销毁'},
+  {module:'script', kind:'type',    name:'Channel',              desc:'双向通信通道句柄（BiDi 独有）'},
+  {module:'script', kind:'type',    name:'ChannelValue',         desc:'通道值，用于跨 Realm 传递'},
+  {module:'script', kind:'type',    name:'EvaluateResult',       desc:'执行结果（成功/异常）'},
+  {module:'script', kind:'type',    name:'ExceptionDetails',     desc:'JS 异常详情'},
+  {module:'script', kind:'type',    name:'Handle',               desc:'远端对象句柄（不可序列化对象的引用）'},
+  {module:'script', kind:'type',    name:'InternalId',           desc:'内部节点 ID'},
+  {module:'script', kind:'type',    name:'LocalValue',           desc:'可传入的本地值类型'},
+  {module:'script', kind:'type',    name:'PreloadScript',        desc:'预加载脚本句柄'},
+  {module:'script', kind:'type',    name:'Realm',                desc:'JS Realm 句柄'},
+  {module:'script', kind:'type',    name:'PrimitiveProtocolValue', desc:'原始协议值（null/bool/number/string 等）'},
+  {module:'script', kind:'type',    name:'RealmInfo',            desc:'Realm 详细信息（类型/URL/沙箱名等）'},
+  {module:'script', kind:'type',    name:'RealmType',            desc:'Realm 类型枚举（window/worker/service-worker 等）'},
+  {module:'script', kind:'type',    name:'RemoteReference',      desc:'远端对象引用（Handle 或 SharedId）'},
+  {module:'script', kind:'type',    name:'RemoteValue',          desc:'远端序列化值'},
+  {module:'script', kind:'type',    name:'ResultOwnership',      desc:'结果所有权（none/root）'},
+  {module:'script', kind:'type',    name:'SerializationOptions', desc:'序列化选项（深度/包含的 Getter 等）'},
+  {module:'script', kind:'type',    name:'SharedId',             desc:'跨 Realm 共享的节点 ID'},
+  {module:'script', kind:'type',    name:'StackFrame',           desc:'调用栈帧信息'},
+  {module:'script', kind:'type',    name:'StackTrace',           desc:'完整调用栈'},
+  {module:'script', kind:'type',    name:'Source',               desc:'脚本来源（Realm / 沙箱）'},
+  {module:'script', kind:'type',    name:'Target',               desc:'脚本执行目标（Context + 可选沙箱）'},
+
+  // ── storage ───────────────────────────────────────────────────────
+  {module:'storage', kind:'command', name:'storage.getCookies',    desc:'查询 Cookie（支持按域/名/路径等过滤）'},
+  {module:'storage', kind:'command', name:'storage.setCookie',     desc:'设置 Cookie'},
+  {module:'storage', kind:'command', name:'storage.deleteCookies', desc:'删除匹配的 Cookie'},
+  {module:'storage', kind:'type',    name:'PartitionKey',          desc:'存储分区键（userContext / sourceOrigin）'},
+
+  // ── log ──────────────────────────────────────────────────────────
+  {module:'log', kind:'event', name:'log.entryAdded', desc:'控制台输出新条目（console.log 等）'},
+  {module:'log', kind:'type',  name:'LogEntry',        desc:'日志条目（级别/来源/文本/堆栈）'},
+
+  // ── input ────────────────────────────────────────────────────────
+  {module:'input', kind:'command', name:'input.performActions', desc:'执行输入动作序列（鼠标/键盘/触控/滚轮）'},
+  {module:'input', kind:'command', name:'input.releaseActions', desc:'释放所有按住的按键和鼠标按钮'},
+  {module:'input', kind:'command', name:'input.setFiles',       desc:'向文件输入控件设置文件列表'},
+  {module:'input', kind:'event',   name:'input.fileDialogOpened', desc:'文件选择对话框被打开'},
+  {module:'input', kind:'type',    name:'ElementOrigin',        desc:'以 DOM 元素为原点的坐标参考系'},
+
+  // ── webExtension ──────────────────────────────────────────────────
+  {module:'webExtension', kind:'command', name:'webExtension.install',   desc:'安装浏览器扩展（Firefox 专有）'},
+  {module:'webExtension', kind:'command', name:'webExtension.uninstall', desc:'卸载浏览器扩展'},
+  {module:'webExtension', kind:'type',    name:'Extension',              desc:'扩展句柄'},
+];
+
+const KIND_LABEL = { command:'命令', event:'事件', type:'类型' };
+const KIND_CLASS = { command:'b-cmd', event:'b-evt', type:'b-type' };
+
+let sortKey = 'module', sortAsc = true, filterKind = 'all', searchQ = '';
+
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; }
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+  document.getElementById('th-' + key)?.classList.add('sorted');
+  render();
+}
+
+function render() {
+  searchQ = document.getElementById('search').value.toLowerCase();
+  let rows = DATA.filter(r => {
+    if (filterKind !== 'all' && r.kind !== filterKind) return false;
+    if (searchQ && !r.module.toLowerCase().includes(searchQ) && !r.name.toLowerCase().includes(searchQ) && !r.desc.includes(searchQ)) return false;
+    return true;
+  });
+  rows.sort((a, b) => {
+    const av = a[sortKey] || '', bv = b[sortKey] || '';
+    return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">没有匹配的结果</td></tr>'; }
+  else tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><span class="mod-name">${r.module}</span><span class="mod-badge ${MOD_CLASS[r.module]}">${MOD_LABEL[r.module]}</span></td>
+      <td><span class="badge ${KIND_CLASS[r.kind]}">${KIND_LABEL[r.kind]}</span></td>
+      <td class="item-name">${r.name}</td>
+      <td class="desc">${r.desc}</td>
+    </tr>`).join('');
+  const cmd = rows.filter(r=>r.kind==='command').length;
+  const evt = rows.filter(r=>r.kind==='event').length;
+  const typ = rows.filter(r=>r.kind==='type').length;
+  document.getElementById('stats').textContent = `共 ${rows.length} 条 · 命令 ${cmd} · 事件 ${evt} · 类型 ${typ}`;
+}
+
+// Tag filters
+const tags = [{k:'all',l:'全部'},{k:'command',l:'命令'},{k:'event',l:'事件'},{k:'type',l:'类型'}];
+document.getElementById('tag-filters').innerHTML = tags.map(t =>
+  `<span class="ftag${t.k==='all'?' active':''}" data-k="${t.k}" onclick="setKind('${t.k}')">${t.l}</span>`
+).join('');
+
+function setKind(k) {
+  filterKind = k;
+  document.querySelectorAll('.ftag').forEach(el => el.classList.toggle('active', el.dataset.k === k));
+  render();
+}
+
+render();
+</script>

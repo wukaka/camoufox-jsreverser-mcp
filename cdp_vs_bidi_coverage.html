@@ -1,0 +1,410 @@
+
+<style>
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); text-align: left; padding: 6px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.tbl td { padding: 6px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); vertical-align: top; }
+.tbl tr:last-child td { border-bottom: none; }
+.badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.full  { background: #EAF3DE; color: #3B6D11; }
+.part  { background: #FAEEDA; color: #854F0B; }
+.none  { background: #FCEBEB; color: #A32D2D; }
+.na    { background: #F1EFE8; color: #5F5E5A; }
+@media (prefers-color-scheme: dark) {
+  .full { background: #27500A; color: #C0DD97; }
+  .part { background: #633806; color: #FAC775; }
+  .none { background: #791F1F; color: #F7C1C1; }
+  .na   { background: #444441; color: #D3D1C7; }
+}
+.sec-header td { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); background: var(--color-background-secondary); padding: 4px 10px; letter-spacing: .04em; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; font-size: 12px; color: var(--color-text-secondary); }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.dot { width: 9px; height: 9px; border-radius: 2px; }
+.note { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
+.domain { font-weight: 500; color: var(--color-text-primary); }
+.bidi-map { font-size: 12px; color: var(--color-text-secondary); }
+.crawl { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); }
+.crawl-yes { color: #3B6D11; }
+.crawl-no  { color: #A32D2D; }
+@media (prefers-color-scheme: dark) {
+  .crawl-yes { color: #97C459; }
+  .crawl-no  { color: #F09595; }
+}
+</style>
+
+<h2 class="sr-only" style="position:absolute;left:-9999px">CDP vs BiDi 覆盖对比表</h2>
+
+<div class="legend">
+  <span><span class="dot" style="background:#639922"></span>完整覆盖</span>
+  <span><span class="dot" style="background:#BA7517"></span>部分覆盖</span>
+  <span><span class="dot" style="background:#E24B4A"></span>无覆盖</span>
+  <span><span class="dot" style="background:#888780"></span>爬虫不相关</span>
+</div>
+
+<table class="tbl">
+<thead>
+<tr>
+  <th style="width:140px">CDP 域</th>
+  <th style="width:80px">BiDi 覆盖</th>
+  <th style="width:60px">爬虫相关</th>
+  <th>说明 / BiDi 对应</th>
+</tr>
+</thead>
+<tbody>
+
+<tr class="sec-header"><td colspan="4">核心控制</td></tr>
+
+<tr>
+  <td class="domain">Network</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">★ 核心</td>
+  <td class="bidi-map">network 模块：addIntercept / continueRequest / continueResponse / provideResponse / setExtraHeaders，事件覆盖 beforeRequestSent / responseCompleted 等</td>
+</tr>
+<tr>
+  <td class="domain">Fetch</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">★ 核心</td>
+  <td class="bidi-map">BiDi network 模块已统一 Fetch 能力，拦截+修改请求/响应均支持</td>
+</tr>
+<tr>
+  <td class="domain">Page</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">★ 核心</td>
+  <td class="bidi-map">browsingContext 模块：navigate / reload / captureScreenshot / setViewport / setBypassCSP；script.addPreloadScript 对应 addScriptToEvaluateOnNewDocument</td>
+</tr>
+<tr>
+  <td class="domain">Runtime</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">★ 核心</td>
+  <td class="bidi-map">script 模块：evaluate / callFunction / addPreloadScript / getRealms，支持跨 realm 执行</td>
+</tr>
+<tr>
+  <td class="domain">Target</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">★ 核心</td>
+  <td class="bidi-map">browsingContext.create/close/getTree + browser.createUserContext，多标签/多上下文管理完整</td>
+</tr>
+<tr>
+  <td class="domain">Storage</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">★ 核心</td>
+  <td class="bidi-map">storage 模块：getCookies / setCookie / deleteCookies，支持 partition key</td>
+</tr>
+<tr>
+  <td class="domain">Input</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">重要</td>
+  <td class="bidi-map">input 模块：performActions / releaseActions / setFiles，鼠标键盘触控均支持</td>
+</tr>
+<tr>
+  <td class="domain">Emulation</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl crawl-yes">重要</td>
+  <td class="bidi-map">emulation 模块：setUserAgentOverride / setGeolocationOverride / setTimezoneOverride / setViewport / setNetworkConditions 等</td>
+</tr>
+<tr>
+  <td class="domain">DOM</td>
+  <td><span class="badge part">部分</span></td>
+  <td class="crawl crawl-yes">重要</td>
+  <td class="bidi-map">browsingContext.locateNodes 提供基础节点定位；复杂 DOM 操作（getBoxModel / resolveNode / requestChildNodes 等）需通过 script.evaluate 间接实现</td>
+</tr>
+<tr>
+  <td class="domain">Log</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">log 模块：log.entryAdded 事件，捕获 console 输出</td>
+</tr>
+<tr>
+  <td class="domain">Console</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">同上，log.entryAdded 统一覆盖</td>
+</tr>
+<tr>
+  <td class="domain">Browser</td>
+  <td><span class="badge full">完整</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">browser 模块：getClientWindows / getUserContexts / setClientWindowState / setDownloadBehavior</td>
+</tr>
+
+<tr class="sec-header"><td colspan="4">调试 / 性能分析</td></tr>
+
+<tr>
+  <td class="domain">Debugger</td>
+  <td><span class="badge part">部分</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">script.realmCreated/Destroyed 提供 realm 生命周期；断点/单步调试无 BiDi 对应（调试器场景不在 BiDi 范围内）</td>
+</tr>
+<tr>
+  <td class="domain">Profiler</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">JS CPU profiling，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">HeapProfiler</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">堆内存分析，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Performance</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">性能指标采集，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">PerformanceTimeline</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">同上</td>
+</tr>
+<tr>
+  <td class="domain">Tracing</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Chrome Trace 格式录制，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Memory</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">内存压力模拟，BiDi 无对应</td>
+</tr>
+
+<tr class="sec-header"><td colspan="4">页面检查 / 渲染</td></tr>
+
+<tr>
+  <td class="domain">CSS</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">CSS 样式规则检查，BiDi 无对应；爬虫场景通过 script.evaluate 读取 computedStyle</td>
+</tr>
+<tr>
+  <td class="domain">DOMSnapshot</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">整页 DOM 快照，BiDi 无直接对应；可用 script.evaluate 序列化 DOM</td>
+</tr>
+<tr>
+  <td class="domain">DOMStorage</td>
+  <td><span class="badge part">部分</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">Cookie 通过 storage 模块覆盖；localStorage/sessionStorage 无直接命令，需 script.evaluate 读写</td>
+</tr>
+<tr>
+  <td class="domain">DOMDebugger</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">DOM 事件断点，调试用途</td>
+</tr>
+<tr>
+  <td class="domain">Overlay</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">DevTools 高亮叠加层，调试用途</td>
+</tr>
+<tr>
+  <td class="domain">LayerTree</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">渲染层分析，调试用途</td>
+</tr>
+<tr>
+  <td class="domain">Accessibility</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">无障碍树查询，BiDi 无对应</td>
+</tr>
+
+<tr class="sec-header"><td colspan="4">存储 / 缓存</td></tr>
+
+<tr>
+  <td class="domain">CacheStorage</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">Service Worker Cache API 检查，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">IndexedDB</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">BiDi 无对应；需 script.evaluate 间接操作</td>
+</tr>
+<tr>
+  <td class="domain">FileSystem</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Origin Private File System，BiDi 无对应</td>
+</tr>
+
+<tr class="sec-header"><td colspan="4">安全 / 其他</td></tr>
+
+<tr>
+  <td class="domain">Security</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">证书错误处理，BiDi 无直接对应；绕过可用 acceptInsecureCerts capability</td>
+</tr>
+<tr>
+  <td class="domain">ServiceWorker</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl">一般</td>
+  <td class="bidi-map">SW 注册/调试，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Audits</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Lighthouse 集成，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Animation</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">CSS 动画检查，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">WebAudio</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Web Audio 图检查，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">WebAuthn</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">虚拟认证器，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Media</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">媒体播放内部状态，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">IO</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">流式 IO handle，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Inspector</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">连接/断开事件，BiDi 用 session 模块替代</td>
+</tr>
+<tr>
+  <td class="domain">Schema</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">协议域列举，BiDi 无需此概念</td>
+</tr>
+<tr>
+  <td class="domain">SystemInfo</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">GPU/显示信息，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Tethering</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Android 端口转发，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">Cast</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Chromecast 控制，Chrome 独有</td>
+</tr>
+<tr>
+  <td class="domain">DeviceAccess</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">USB/蓝牙设备访问，BiDi 无对应</td>
+</tr>
+<tr>
+  <td class="domain">DeviceOrientation</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">陀螺仪模拟，BiDi 无对应（emulation 模块有 setTouchOverride）</td>
+</tr>
+<tr>
+  <td class="domain">BluetoothEmulation</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">蓝牙模拟，Chrome 实验性</td>
+</tr>
+<tr>
+  <td class="domain">SmartCardEmulation</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">智能卡模拟，Chrome 实验性</td>
+</tr>
+<tr>
+  <td class="domain">FedCm</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">联合身份，Chrome 实验性</td>
+</tr>
+<tr>
+  <td class="domain">Autofill</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">自动填充测试，Chrome 专有</td>
+</tr>
+<tr>
+  <td class="domain">BackgroundService</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">后台推送/通知记录，调试用途</td>
+</tr>
+<tr>
+  <td class="domain">Preload</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">推测预加载规则，Chrome 专有</td>
+</tr>
+<tr>
+  <td class="domain">Extensions</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Chrome 扩展 storage，Chrome 专有（BiDi 有独立 webExtension 模块用于 Firefox 扩展）</td>
+</tr>
+<tr>
+  <td class="domain">EventBreakpoints</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">事件监听断点，调试用途</td>
+</tr>
+<tr>
+  <td class="domain">HeadlessExperimental</td>
+  <td><span class="badge na">不适用</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">旧版 Headless 接口，已被 Chrome Headless 新模式取代</td>
+</tr>
+<tr>
+  <td class="domain">PWA</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">PWA 安装操作，Chrome 专有</td>
+</tr>
+<tr>
+  <td class="domain">WebMCP</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">Chrome 实验性 MCP，非常新</td>
+</tr>
+<tr>
+  <td class="domain">CrashReportContext</td>
+  <td><span class="badge none">无覆盖</span></td>
+  <td class="crawl crawl-no">不相关</td>
+  <td class="bidi-map">崩溃报告，Chrome 内部用途</td>
+</tr>
+
+</tbody>
+</table>
+
+<div style="margin-top:14px;padding:12px;background:var(--color-background-secondary);border-radius:8px">
+<p class="note">BiDi 额外新增（CDP 无对应）：<strong>webExtension 模块</strong>（Firefox 扩展安装/卸载）、<strong>browser.createUserContext</strong>（隔离 profile）、<strong>script.Channel</strong>（页面↔控制端双向消息通道）。</p>
+</div>

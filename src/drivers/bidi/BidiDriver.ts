@@ -70,12 +70,10 @@ export class BidiDriver extends EventEmitter {
 
   listSubscriptions(): readonly Subscription[] { return this.subs.list(); }
 
-  replaySubscriptions(): Promise<void> {
-    return Promise.all(
-      this.subs.list().map(s =>
-        this.send('session.subscribe', { events: s.events, ...(s.contexts ? { contexts: s.contexts } : {}) }),
-      ),
-    ).then(() => undefined);
+  async replaySubscriptions(): Promise<void> {
+    for (const s of this.subs.list()) {
+      await this.send('session.subscribe', { events: s.events, ...(s.contexts ? { contexts: s.contexts } : {}) });
+    }
   }
 
   private onMessage(raw: string): void {

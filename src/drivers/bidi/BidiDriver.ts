@@ -58,6 +58,8 @@ export class BidiDriver extends EventEmitter {
 
   private onMessage(raw: string): void {
     let msg: BidiIncoming;
+    // Silently discard frames we can't parse. The BiDi protocol does not provide a recovery path
+    // for malformed frames, and crashing the driver on garbage would take down every in-flight call.
     try { msg = JSON.parse(raw) as BidiIncoming; } catch { return; }
     if (msg.type === 'event') {
       this.emit(msg.method, msg.params);

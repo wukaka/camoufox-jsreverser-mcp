@@ -24,7 +24,7 @@ describe('FirefoxLauncher.launch', () => {
       firefoxPath: '/usr/bin/firefox',
     });
     const p = launcher.launch({});
-    queueMicrotask(() => {
+    setImmediate(() => {
       proc.stderr.emit('data', Buffer.from(
         'Remote Debugging Server listening on port 6000\n' +
         'WebDriver BiDi listening on ws://127.0.0.1:9222/session/abc\n',
@@ -38,19 +38,17 @@ describe('FirefoxLauncher.launch', () => {
 
   it('rejects on stderr timeout', async () => {
     const proc = fakeProcess();
-    vi.useFakeTimers();
     const launcher = new FirefoxLauncher({
       spawn: vi.fn().mockReturnValue(proc),
       mkdtemp: vi.fn().mockResolvedValue('/tmp/x'),
       writeFile: vi.fn().mockResolvedValue(undefined),
       rm: vi.fn().mockResolvedValue(undefined),
       firefoxPath: '/usr/bin/firefox',
-      startupTimeoutMs: 1000,
+      startupTimeoutMs: 50,
     });
-    const p = launcher.launch({});
-    vi.advanceTimersByTime(1100);
-    await expect(p).rejects.toThrow(/timeout/i);
-  });
+    // No stderr emit → timeout fires after 50ms of real time.
+    await expect(launcher.launch({})).rejects.toThrow(/timeout/i);
+  }, 1000);
 
   it('writes user.js into the temp profile', async () => {
     const proc = fakeProcess();
@@ -63,7 +61,7 @@ describe('FirefoxLauncher.launch', () => {
       firefoxPath: '/usr/bin/firefox',
     });
     const p = launcher.launch({});
-    queueMicrotask(() => {
+    setImmediate(() => {
       proc.stderr.emit('data', Buffer.from(
         'Remote Debugging Server listening on port 6000\n' +
         'WebDriver BiDi listening on ws://127.0.0.1:9222/session/abc\n',
@@ -99,7 +97,7 @@ describe('FirefoxLauncher.shutdown', () => {
       firefoxPath: '/usr/bin/firefox',
     });
     const p = launcher.launch({});
-    queueMicrotask(() => proc.stderr.emit('data', Buffer.from(
+    setImmediate(() => proc.stderr.emit('data', Buffer.from(
       'WebDriver BiDi listening on ws://127.0.0.1:9222/session/x\n' +
       'Remote Debugging Server listening on port 6000\n',
     )));

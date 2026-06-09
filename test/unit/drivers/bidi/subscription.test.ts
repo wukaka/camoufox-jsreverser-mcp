@@ -55,9 +55,16 @@ describe('BidiDriver.subscribe', () => {
     // simulate reconnect: clear sent buffer
     sock.sent.length = 0;
     const replay = drv.replaySubscriptions();
-    // two new outbound frames expected
-    expect(sock.sent).toHaveLength(2);
+
+    // Sequential replay: respond as each frame appears.
+    // Frame 1 is enqueued synchronously inside the first send().
+    await Promise.resolve(); // let send() run to the await point
+    expect(sock.sent).toHaveLength(1);
     sock.receive({ type: 'success', id: JSON.parse(sock.sent[0]!).id, result: {} });
+    await Promise.resolve();
+    await Promise.resolve();
+    // Frame 2 enqueued only after frame 1's response was processed.
+    expect(sock.sent).toHaveLength(2);
     sock.receive({ type: 'success', id: JSON.parse(sock.sent[1]!).id, result: {} });
     await replay;
     const sentMethods = sock.sent.map(s => JSON.parse(s).method);

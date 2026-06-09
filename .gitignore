@@ -1,0 +1,8 @@
+node_modules/
+build/
+.env
+*.log
+coverage/
+artifacts/tasks/
+!artifacts/tasks/_TEMPLATE/
+.DS_Store

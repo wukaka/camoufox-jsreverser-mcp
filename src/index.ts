@@ -23,6 +23,7 @@ import { debuggerTools } from './tools/debugger/index.js';
 import { prefsTools } from './tools/prefs/index.js';
 import { stealthTools } from './tools/stealth/index.js';
 import { aiAstTools } from './tools/ai-ast/index.js';
+import { rebuildTools } from './tools/rebuild/index.js';
 
 async function main(): Promise<void> {
   const argv = parseArgv(process.argv.slice(2));
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
     ...prefsTools,
     ...stealthTools,
     ...aiAstTools,
+    ...rebuildTools,
   ]);
 }
 

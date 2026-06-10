@@ -23,6 +23,7 @@ export class HookTable {
   put(e: HookEntry): void { this.byId.set(e.hookId, e); }
   get(id: string): HookEntry | undefined { return this.byId.get(id); }
   list(): HookEntry[] { return [...this.byId.values()]; }
+  delete(id: string): boolean { return this.byId.delete(id); }
 }
 
 export class WsTable {

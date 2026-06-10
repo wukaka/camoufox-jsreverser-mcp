@@ -15,6 +15,10 @@ import { scriptsTools } from './tools/scripts/index.js';
 import { hooksTools } from './tools/hooks/index.js';
 import { networkTools } from './tools/network/index.js';
 import { storageTools } from './tools/storage/index.js';
+import { domTools } from './tools/dom/index.js';
+import { consoleTools } from './tools/console/index.js';
+import { websocketTools } from './tools/websocket/index.js';
+import { workersTools } from './tools/workers/index.js';
 
 async function main(): Promise<void> {
   const argv = parseArgv(process.argv.slice(2));
@@ -50,7 +54,17 @@ async function main(): Promise<void> {
     stealth: argv.stealth,
   });
 
-  await startServer(session, [...pageStateTools, ...scriptsTools, ...hooksTools, ...networkTools, ...storageTools]);
+  await startServer(session, [
+    ...pageStateTools,
+    ...scriptsTools,
+    ...hooksTools,
+    ...networkTools,
+    ...storageTools,
+    ...domTools,
+    ...consoleTools,
+    ...websocketTools,
+    ...workersTools,
+  ]);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

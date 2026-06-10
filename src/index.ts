@@ -20,6 +20,7 @@ import { consoleTools } from './tools/console/index.js';
 import { websocketTools } from './tools/websocket/index.js';
 import { workersTools } from './tools/workers/index.js';
 import { debuggerTools } from './tools/debugger/index.js';
+import { prefsTools } from './tools/prefs/index.js';
 
 async function main(): Promise<void> {
   const argv = parseArgv(process.argv.slice(2));
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
     ...websocketTools,
     ...workersTools,
     ...debuggerTools,
+    ...prefsTools,
   ]);
 }
 

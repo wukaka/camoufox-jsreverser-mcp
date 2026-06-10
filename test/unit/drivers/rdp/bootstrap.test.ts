@@ -25,11 +25,20 @@ describe('bootstrapRdp', () => {
       expect(req.type).toBe('getWatcher');
       return { from: 'tabDesc-1', actor: 'watcher-1' };
     });
-    // 3. watchTargets frame
+    // 3. watchTargets frame — Firefox emits the first target-available-form
+    //    synchronously as part of handling watchTargets. Simulate that by
+    //    emitting WITHIN this mock impl, after the watcher actor is known.
     drv.call.mockImplementationOnce(async (actor: string, req: { type: string; targetType: string }) => {
       expect(actor).toBe('watcher-1');
       expect(req.type).toBe('watchTargets');
       expect(req.targetType).toBe('frame');
+      // Emit during the watchTargets call so the await sees the event after subscribing.
+      queueMicrotask(() => {
+        drv.emit('watcher-1.target-available-form', {
+          from: 'watcher-1',
+          target: { actor: 'targetActor-1', browsingContextID: 42, targetType: 'frame' },
+        });
+      });
       return { from: 'watcher-1' };
     });
     // 4. watchTargets worker
@@ -37,11 +46,6 @@ describe('bootstrapRdp', () => {
       expect(actor).toBe('watcher-1');
       expect(req.targetType).toBe('worker');
       return { from: 'watcher-1' };
-    });
-
-    // Simulate target-available-form for the frame target landing as a watcher event after watchTargets:
-    queueMicrotask(() => {
-      drv.emit('watcher-1.target-available-form', { from: 'watcher-1', target: { actor: 'targetActor-1', browsingContextID: 42, targetType: 'frame' } });
     });
 
     const tree = await bootstrapRdp(drv as any);

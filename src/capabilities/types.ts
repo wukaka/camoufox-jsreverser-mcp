@@ -34,12 +34,25 @@ export interface NetworkObserver {
   getData(params: { dataType: string; collector?: string; disown?: boolean; request: string }): Promise<{ bytes: { type: 'string' | 'base64'; value: string } }>;
 }
 
+export interface LogEntry {
+  type: 'console' | 'javascript';
+  level: 'debug' | 'info' | 'warn' | 'error' | string;
+  text: string;
+  timestamp: number;
+  source?: string;
+}
+
+export interface LogSink {
+  // subscribes BiDi log.entryAdded on construction; pushes into the ConsoleRing
+  // no public commands — just acts as a sink
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
   networkObserver?: NetworkObserver;
   wsObserver?: unknown;
-  logSink?: unknown;
+  logSink?: LogSink;
   storageAccess?: unknown;
   pageController?: unknown;
   domAccess?: unknown;

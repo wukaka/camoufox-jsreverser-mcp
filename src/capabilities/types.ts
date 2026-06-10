@@ -224,6 +224,41 @@ export interface PauseController {
   unfreezeCurrent(): Promise<void>;
 }
 
+export interface RdpGrip {
+  type: 'object' | 'string' | 'number' | 'boolean' | 'null' | 'undefined' | 'symbol' | 'BigInt' | 'longString' | 'mapEntry';
+  actor?: string;
+  class?: string;
+  preview?: unknown;
+  value?: unknown;
+  [k: string]: unknown;
+}
+
+export interface InspectedProperty {
+  name: string;
+  kind: 'data' | 'accessor' | 'safeGetter';
+  value?: unknown;
+  getter?: RdpGrip;
+  setter?: RdpGrip;
+  writable?: boolean;
+  enumerable?: boolean;
+  configurable?: boolean;
+}
+
+export interface ObjectInspection {
+  actor: string;
+  class: string;
+  prototype: RdpGrip | null;
+  properties: InspectedProperty[];
+  internalSlots: Record<string, unknown>;
+}
+
+export interface ObjectInspector {
+  inspect(grip: RdpGrip): { actor: string; class: string; preview: unknown };
+  prototypeAndProperties(grip: RdpGrip): Promise<ObjectInspection>;
+  getInternalSlots(grip: RdpGrip): Promise<Record<string, unknown>>;
+  releasePauseGrips(pauseActor: string): void;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -234,7 +269,7 @@ export interface Capabilities {
   pageController?: PageController;
   domAccess?: DomAccess;
   pauseController?: PauseController;
-  objectInspector?: unknown;
+  objectInspector?: ObjectInspector;
   eventMonitor?: unknown;
   performanceProbe?: unknown;
   initiatorTracer?: unknown;

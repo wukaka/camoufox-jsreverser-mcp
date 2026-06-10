@@ -23,4 +23,26 @@ describe('get_performance_metrics', () => {
     const r = await executeTool(get_performance_metrics, {}, session);
     expect(r.ok).toBe(false);
   });
+
+  it('merges engine metrics when performanceProbe is wired', async () => {
+    const scriptHost = {
+      evaluate: vi.fn().mockResolvedValue({ result: { value: { domContentLoaded: 1.2 } } }),
+      listRealms: vi.fn().mockResolvedValue([{ realmId: 'r1', origin: 'https://a', type: 'window' }]),
+    };
+    const probe = {
+      getEngineMetrics: vi.fn().mockResolvedValue({ memory: { usedJSHeapSize: 999 }, gcCount: 3 }),
+    };
+    const session = {
+      isReady: () => true,
+      caps: { scriptHost, performanceProbe: probe },
+      activeContextId: 'c1',
+    } as any;
+    const r = await executeTool(get_performance_metrics, {}, session);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.metrics.domContentLoaded).toBe(1.2);
+      expect(r.data.engine).toBeDefined();
+      expect((r.data.engine as any).memory.usedJSHeapSize).toBe(999);
+    }
+  });
 });

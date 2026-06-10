@@ -361,6 +361,29 @@ export interface LlmProvider {
   call(req: LlmCallRequest): Promise<LlmCallResponse>;
 }
 
+export interface TaskMeta {
+  taskId: string;
+  taskRoot: string;
+  createdAt: number;
+}
+
+export interface TaskArtifacts {
+  /** Filesystem root that contains tasks/<taskId>/. */
+  artifactsRoot(): string;
+  /** Create the directory layout for a new task; idempotent. */
+  createTask(taskId: string): Promise<TaskMeta>;
+  /** Append a chunk (auto newline for .jsonl). */
+  write(taskId: string, relPath: string, content: string | Uint8Array): Promise<void>;
+  /** Read file content; throws if absent. */
+  read(taskId: string, relPath: string): Promise<string>;
+  /** Existing task IDs in artifactsRoot/tasks. */
+  listTasks(): Promise<string[]>;
+  /** Returns the in-repo template directory (for documentation / scaffolding). */
+  templateDir(): string;
+  /** Resolves the absolute task directory; useful for tools that need to return paths. */
+  taskRoot(taskId: string): string;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -382,6 +405,6 @@ export interface Capabilities {
   astAnalyzer?: AstAnalyzer;
   cryptoSignatures?: CryptoSignatures;
   llmProvider?: LlmProvider;
-  taskArtifacts?: unknown;
+  taskArtifacts?: TaskArtifacts;
   runtimePrefs?: RuntimePrefs;
 }

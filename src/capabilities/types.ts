@@ -1,6 +1,13 @@
 // Stub capability container — concrete interfaces are filled in by their own tasks (M2/M3).
+
+export interface ScriptHost {
+  listRealms(contextId?: string): Promise<Array<{ realmId: string; origin: string; type: 'window' | 'worker' | 'service-worker' }>>;
+  evaluate(realmId: string, expression: string, opts?: { awaitPromise?: boolean }): Promise<{ result: unknown; exceptionDetails?: unknown }>;
+  callFunction(realmId: string, fn: string, args: unknown[], opts?: { awaitPromise?: boolean }): Promise<{ result: unknown; exceptionDetails?: unknown }>;
+}
+
 export interface Capabilities {
-  scriptHost?: unknown;
+  scriptHost?: ScriptHost;
   preloadInjector?: unknown;
   networkObserver?: unknown;
   wsObserver?: unknown;

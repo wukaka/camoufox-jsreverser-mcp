@@ -31,6 +31,7 @@ export class WsTable {
   put(e: WsEntry): void { this.byKey.set(`${e.targetId}:${e.wsid}`, e); }
   get(targetId: string, wsid: string): WsEntry | undefined { return this.byKey.get(`${targetId}:${wsid}`); }
   list(): WsEntry[] { return [...this.byKey.values()]; }
+  delete(targetId: string, wsid: string): boolean { return this.byKey.delete(`${targetId}:${wsid}`); }
 }
 
 export class ConsoleRing {

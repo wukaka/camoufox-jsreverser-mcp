@@ -58,4 +58,70 @@ describe('Session', () => {
     expect(launcher.shutdown).toHaveBeenCalled();
     expect(s.isReady()).toBe(false);
   });
+
+  it('init with stealth=auto wires caps and applies firefox-default preset', async () => {
+    // mock bidi.send to record the preload call
+    const bidiSends: Array<{ method: string; params: unknown }> = [];
+    const bidi = {
+      send: vi.fn().mockImplementation(async (method: string, params: unknown) => {
+        bidiSends.push({ method, params });
+        if (method === 'script.addPreloadScript') return { script: 'preload-1' };
+        return {};
+      }),
+      close: vi.fn(),
+    };
+    const launcher = {
+      launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }),
+      attach: vi.fn(), shutdown: vi.fn(),
+    };
+    const s = new Session({ launcher: launcher as any, makeBidi: vi.fn().mockResolvedValue(bidi), makeRdp: vi.fn() });
+    await s.init({ mode: 'launch', stealth: 'auto' });
+    // scriptHost / preloadInjector / stealth all wired
+    expect(s.caps.scriptHost).toBeDefined();
+    expect(s.caps.preloadInjector).toBeDefined();
+    expect(s.caps.stealth).toBeDefined();
+    // bidi.send was called for script.addPreloadScript with the firefox-default payload
+    const preloadCall = bidiSends.find(c => c.method === 'script.addPreloadScript');
+    expect(preloadCall).toBeDefined();
+    expect((preloadCall!.params as { functionDeclaration: string }).functionDeclaration).toMatch(/webdriver/);
+    expect(s.stealthApplyError).toBeNull();
+  });
+
+  it('init with stealth=off wires caps but does NOT apply preset', async () => {
+    const bidiSends: Array<{ method: string }> = [];
+    const bidi = {
+      send: vi.fn().mockImplementation(async (method: string) => {
+        bidiSends.push({ method });
+        return {};
+      }),
+      close: vi.fn(),
+    };
+    const launcher = {
+      launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }),
+      attach: vi.fn(), shutdown: vi.fn(),
+    };
+    const s = new Session({ launcher: launcher as any, makeBidi: vi.fn().mockResolvedValue(bidi), makeRdp: vi.fn() });
+    await s.init({ mode: 'launch', stealth: 'off' });
+    expect(s.caps.stealth).toBeDefined();
+    const preloadCall = bidiSends.find(c => c.method === 'script.addPreloadScript');
+    expect(preloadCall).toBeUndefined();
+  });
+
+  it('init records stealthApplyError when preset apply throws', async () => {
+    const bidi = {
+      send: vi.fn().mockImplementation(async (method: string) => {
+        if (method === 'script.addPreloadScript') throw new Error('boom');
+        return {};
+      }),
+      close: vi.fn(),
+    };
+    const launcher = {
+      launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }),
+      attach: vi.fn(), shutdown: vi.fn(),
+    };
+    const s = new Session({ launcher: launcher as any, makeBidi: vi.fn().mockResolvedValue(bidi), makeRdp: vi.fn() });
+    await s.init({ mode: 'launch', stealth: 'auto' });
+    expect(s.isReady()).toBe(true);
+    expect(s.stealthApplyError).toBeInstanceOf(Error);
+  });
 });

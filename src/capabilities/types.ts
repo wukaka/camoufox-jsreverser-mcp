@@ -152,11 +152,34 @@ export interface RuntimePrefs {
   resetAll(): Promise<void>;
 }
 
+export interface WsFrame {
+  ts: number;
+  dir: 'in' | 'out';
+  data: unknown;
+  source: 'rdp' | 'preload-hook';
+}
+
+export interface WsConnectionInfo {
+  targetId: string;
+  wsid: string;
+  url: string;
+  frameCount: number;
+  openedAt?: number;
+  closedAt?: number;
+}
+
+export interface WsObserver {
+  listConnections(filter?: { targetId?: string; urlSubstring?: string }): WsConnectionInfo[];
+  getFrames(wsid: string, opts?: { limit?: number; dir?: 'in' | 'out'; since?: number }): WsFrame[];
+  /** Returns the preload script source that hooks WebSocket.prototype to ship frames to dispatcher. Caller injects via preloadInjector. */
+  installFrameHook(): string;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
   networkObserver?: NetworkObserver;
-  wsObserver?: unknown;
+  wsObserver?: WsObserver;
   logSink?: LogSink;
   storageAccess?: StorageAccess;
   pageController?: PageController;

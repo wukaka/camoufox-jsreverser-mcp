@@ -259,6 +259,22 @@ export interface ObjectInspector {
   releasePauseGrips(pauseActor: string): void;
 }
 
+export interface MonitorRecord {
+  monitorId: string;
+  resourceTypes: string[];
+  startedAt: number;
+  collected: unknown[];
+}
+
+export interface EventMonitor {
+  /** Start a monitor for given RDP resource types. Returns monitorId. */
+  start(resourceTypes: string[]): Promise<{ monitorId: string }>;
+  /** Stop and unwatch. */
+  stop(monitorId: string): Promise<void>;
+  list(): MonitorRecord[];
+  get(monitorId: string): MonitorRecord | undefined;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -270,7 +286,7 @@ export interface Capabilities {
   domAccess?: DomAccess;
   pauseController?: PauseController;
   objectInspector?: ObjectInspector;
-  eventMonitor?: unknown;
+  eventMonitor?: EventMonitor;
   performanceProbe?: unknown;
   initiatorTracer?: unknown;
   stealth?: unknown;

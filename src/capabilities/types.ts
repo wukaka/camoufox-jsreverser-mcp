@@ -325,6 +325,21 @@ export interface AstAnalyzer {
   listTransforms(): string[];
 }
 
+export interface CryptoRule {
+  name: string;
+  detect(source: string): boolean;
+}
+
+export interface CryptoMatch {
+  name: string;
+  confidence: 'high';
+}
+
+export interface CryptoSignatures {
+  detect(source: string): CryptoMatch[];
+  listRules(): string[];
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -344,7 +359,7 @@ export interface Capabilities {
   hookRegistry?: HookRegistry;
   workerTopology?: WorkerTopology;
   astAnalyzer?: AstAnalyzer;
-  cryptoSignatures?: unknown;
+  cryptoSignatures?: CryptoSignatures;
   llmProvider?: unknown;
   taskArtifacts?: unknown;
   runtimePrefs?: RuntimePrefs;

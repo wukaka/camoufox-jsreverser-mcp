@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../../server/tool-registry.js';
 import { ok, fail, ErrorReason } from '../../server/result.js';
-import type { ScriptHost } from '../../capabilities/types.js';
+import type { ScriptHost, PerformanceProbe } from '../../capabilities/types.js';
 
 const METRICS_SCRIPT = `(() => {
   const nav = performance.getEntriesByType('navigation')[0] || {};
@@ -33,6 +33,14 @@ export const get_performance_metrics = defineTool({
     if (!realm) return fail(ErrorReason.TargetNotFound, { hint: 'No window realm for active context.' });
     const r = await sh.evaluate(realm.realmId, METRICS_SCRIPT, { awaitPromise: false });
     const metrics = (r.result as { value?: Record<string, unknown> })?.value ?? {};
-    return ok({ metrics, contextId: ctxId });
+
+    // Merge engine-level metrics if performanceProbe is wired (M3).
+    let engine: Record<string, unknown> | undefined;
+    const probe = session.caps.performanceProbe as PerformanceProbe | undefined;
+    if (probe) {
+      engine = await probe.getEngineMetrics();
+    }
+
+    return ok({ metrics, engine, contextId: ctxId });
   },
 });

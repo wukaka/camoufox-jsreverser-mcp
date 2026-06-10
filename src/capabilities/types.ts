@@ -275,6 +275,10 @@ export interface EventMonitor {
   get(monitorId: string): MonitorRecord | undefined;
 }
 
+export interface PerformanceProbe {
+  getEngineMetrics(): Promise<Record<string, unknown>>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -287,7 +291,7 @@ export interface Capabilities {
   pauseController?: PauseController;
   objectInspector?: ObjectInspector;
   eventMonitor?: EventMonitor;
-  performanceProbe?: unknown;
+  performanceProbe?: PerformanceProbe;
   initiatorTracer?: unknown;
   stealth?: unknown;
   sessionState?: unknown;

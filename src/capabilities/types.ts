@@ -83,6 +83,20 @@ export interface PageController {
   handleUserPrompt(contextId: string, action: 'accept' | 'dismiss', userText?: string): Promise<void>;
 }
 
+export interface NodeRef {
+  sharedId: string;
+  backendNodeId?: string;
+}
+
+export interface DomAccess {
+  query(contextId: string, selector: string): Promise<NodeRef[]>;
+  click(contextId: string, sharedId: string): Promise<void>;
+  /** v1: synthetic value assignment via scriptHost.evaluate. Real key events land in M3. */
+  type(contextId: string, sharedId: string, text: string, opts?: { clearFirst?: boolean }): Promise<void>;
+  /** v1: presence-only polling (visible check deferred to M3). */
+  waitFor(contextId: string, selector: string, opts?: { timeoutMs?: number; state?: 'present' | 'visible' }): Promise<NodeRef>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -91,7 +105,7 @@ export interface Capabilities {
   logSink?: LogSink;
   storageAccess?: StorageAccess;
   pageController?: PageController;
-  domAccess?: unknown;
+  domAccess?: DomAccess;
   pauseController?: unknown;
   objectInspector?: unknown;
   eventMonitor?: unknown;

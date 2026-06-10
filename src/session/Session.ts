@@ -31,6 +31,14 @@ export class Session {
   readonly caps: Capabilities = {};
   activeContextId: string | null = null;
   activeFrameContextId: string | null = null;
+  xhrBreakpoints: Array<{ id: string; urlPattern: string; preloadId?: string }> = [];
+  sessionSnapshots: Map<string, {
+    name: string;
+    capturedAt: number;
+    cookies: object[];
+    localByOrigin: Record<string, Record<string, string>>;
+    sessionByOrigin: Record<string, Record<string, string>>;
+  }> = new Map();
 
   bidi!: BidiDriver;
   private rdpFactory: ((port: number) => Promise<RdpDriver>) | null = null;

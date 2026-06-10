@@ -10,7 +10,7 @@ import { BidiDriver } from './drivers/bidi/BidiDriver.js';
 import { RdpDriver } from './drivers/rdp/RdpDriver.js';
 import { Session } from './session/Session.js';
 import { startServer } from './server/server.js';
-import { check_browser_health } from './tools/page-state/check_browser_health.js';
+import { pageStateTools } from './tools/page-state/index.js';
 
 async function main(): Promise<void> {
   const argv = parseArgv(process.argv.slice(2));
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
     stealth: argv.stealth,
   });
 
-  await startServer(session, [check_browser_health]);
+  await startServer(session, pageStateTools);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -29,6 +29,8 @@ export class Session {
   readonly wsTable = new WsTable();
   readonly consoleRing = new ConsoleRing();
   readonly caps: Capabilities = {};
+  activeContextId: string | null = null;
+  activeFrameContextId: string | null = null;
 
   bidi!: BidiDriver;
   private rdpFactory: ((port: number) => Promise<RdpDriver>) | null = null;

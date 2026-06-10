@@ -308,6 +308,23 @@ export interface Stealth {
   injectCustomScript(source: string): Promise<{ preloadId: string }>;
 }
 
+export interface AstParseResult {
+  ast: unknown;
+  error?: { line: number; column: number; message: string };
+}
+
+export interface AstTransformResult {
+  code: string;
+  changed: boolean;
+  analysis?: unknown;
+}
+
+export interface AstAnalyzer {
+  parse(source: string): AstParseResult;
+  runTransform(source: string, transformName: string): AstTransformResult;
+  listTransforms(): string[];
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -326,7 +343,7 @@ export interface Capabilities {
   sessionState?: unknown;
   hookRegistry?: HookRegistry;
   workerTopology?: WorkerTopology;
-  astAnalyzer?: unknown;
+  astAnalyzer?: AstAnalyzer;
   cryptoSignatures?: unknown;
   llmProvider?: unknown;
   taskArtifacts?: unknown;

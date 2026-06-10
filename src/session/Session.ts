@@ -71,12 +71,14 @@ export class Session {
     const { makeScriptHost } = await import('../capabilities/scriptHost.js');
     const { makePreloadInjector } = await import('../capabilities/preloadInjector.js');
     const { makeStealth } = await import('../capabilities/stealth.js');
+    const { makeAstAnalyzer } = await import('../capabilities/astAnalyzer.js');
     const scriptHost = makeScriptHost(this.bidi);
     this.caps.scriptHost = scriptHost;
     const preloadInjector = makePreloadInjector(this.bidi, scriptHost);
     this.caps.preloadInjector = preloadInjector;
     const stealth = makeStealth(preloadInjector);
     this.caps.stealth = stealth;
+    this.caps.astAnalyzer = makeAstAnalyzer();
 
     if (opts.stealth === 'auto') {
       try {

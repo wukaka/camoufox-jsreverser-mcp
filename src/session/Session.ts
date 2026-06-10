@@ -43,6 +43,7 @@ export class Session {
   activeWorkerRealmId: string | null = null;
 
   bidi!: BidiDriver;
+  stealthApplyError: Error | null = null;
   private rdpFactory: ((port: number) => Promise<RdpDriver>) | null = null;
   private rdp: RdpDriver | null = null;
   private rdpPort: number | null = null;
@@ -65,6 +66,28 @@ export class Session {
     }
     this.bidi = await this.deps.makeBidi(this.endpoints.bidiUrl);
     this.rdpPort = this.endpoints.rdpPort;
+
+    // Wire BiDi-side capabilities required by stealth.
+    const { makeScriptHost } = await import('../capabilities/scriptHost.js');
+    const { makePreloadInjector } = await import('../capabilities/preloadInjector.js');
+    const { makeStealth } = await import('../capabilities/stealth.js');
+    const scriptHost = makeScriptHost(this.bidi);
+    this.caps.scriptHost = scriptHost;
+    const preloadInjector = makePreloadInjector(this.bidi, scriptHost);
+    this.caps.preloadInjector = preloadInjector;
+    const stealth = makeStealth(preloadInjector);
+    this.caps.stealth = stealth;
+
+    if (opts.stealth === 'auto') {
+      try {
+        await stealth.applyPreset('firefox-default');
+      } catch (err) {
+        // Surface as warning but don't fail session.init — stealth is best-effort.
+        // Caller can inspect this.stealthApplyError later.
+        this.stealthApplyError = err as Error;
+      }
+    }
+
     this.ready = true;
   }
 

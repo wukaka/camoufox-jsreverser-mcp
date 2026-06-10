@@ -108,6 +108,43 @@ export interface WorkerTopology {
   listWorkers(): Promise<WorkerInfo[]>;
 }
 
+export interface HookSpec {
+  name: string;
+  /** A JavaScript expression that evaluates to the function to be wrapped.
+   *  Examples: "window.fetch", "XMLHttpRequest.prototype.send", "MyClass.prototype.doIt" */
+  targetExpr: string;
+  /** What to capture in each sample. */
+  capture: Array<'args' | 'return' | 'stack' | 'this'>;
+}
+
+export interface HookSample {
+  hookId: string;
+  ts: number;
+  args?: unknown[];
+  ret?: unknown;
+  threw?: string;
+  stack?: string;
+  thisArg?: unknown;
+}
+
+export interface InjectOpts {
+  /** 'page' = main world preload; 'worker:<realmId>' = single worker; 'all-workers' = all known workers */
+  target: 'page' | `worker:${string}` | 'all-workers';
+}
+
+export interface InjectResult {
+  hookId: string;
+  warnings: string[];
+}
+
+export interface HookRegistry {
+  create(spec: HookSpec): { hookId: string; scriptPreview: string };
+  inject(hookId: string, opts: InjectOpts): Promise<InjectResult>;
+  read(hookId: string, opts?: { limit?: number; since?: number }): HookSample[];
+  list(): Array<{ hookId: string; name: string; targetExpr: string; sampleCount: number; injected: boolean }>;
+  remove(hookId: string): Promise<void>;
+}
+
 export interface RuntimePrefs {
   /** M3 wires real RDP PreferenceActor; M2 stub rejects with PrefsActorUnavailableError. */
   set(key: string, value: string | number | boolean): Promise<void>;
@@ -131,7 +168,7 @@ export interface Capabilities {
   initiatorTracer?: unknown;
   stealth?: unknown;
   sessionState?: unknown;
-  hookRegistry?: unknown;
+  hookRegistry?: HookRegistry;
   workerTopology?: WorkerTopology;
   astAnalyzer?: unknown;
   cryptoSignatures?: unknown;

@@ -47,13 +47,25 @@ export interface LogSink {
   // no public commands — just acts as a sink
 }
 
+export interface StorageAccess {
+  getCookies(params?: { filter?: object; partition?: object }): Promise<{ cookies: object[]; partitionKey?: object }>;
+  setCookie(params: { cookie: object; partition?: object }): Promise<{ partitionKey?: object }>;
+  deleteCookies(params?: { filter?: object; partition?: object }): Promise<{ partitionKey?: object }>;
+  // localStorage / sessionStorage go through scriptHost.evaluate (M2.01)
+  getLocalStorage(realmId: string): Promise<Record<string, string>>;
+  setLocalStorage(realmId: string, key: string, value: string): Promise<void>;
+  getSessionStorage(realmId: string): Promise<Record<string, string>>;
+  // IndexedDB: queries db names and reads object stores via evaluate
+  listIndexedDbNames(realmId: string): Promise<string[]>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
   networkObserver?: NetworkObserver;
   wsObserver?: unknown;
   logSink?: LogSink;
-  storageAccess?: unknown;
+  storageAccess?: StorageAccess;
   pageController?: unknown;
   domAccess?: unknown;
   pauseController?: unknown;

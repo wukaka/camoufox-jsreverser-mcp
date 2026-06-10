@@ -279,6 +279,23 @@ export interface PerformanceProbe {
   getEngineMetrics(): Promise<Record<string, unknown>>;
 }
 
+export interface NormalizedStackFrame {
+  scriptUrl: string;
+  line: number;
+  column: number;
+  functionName?: string;
+}
+
+export interface NormalizedInitiator {
+  type: 'script' | 'parser' | 'preflight' | 'preload' | 'other';
+  request?: string;
+  stack: NormalizedStackFrame[];
+}
+
+export interface InitiatorTracer {
+  normalize(initiator: unknown): NormalizedInitiator;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -292,7 +309,7 @@ export interface Capabilities {
   objectInspector?: ObjectInspector;
   eventMonitor?: EventMonitor;
   performanceProbe?: PerformanceProbe;
-  initiatorTracer?: unknown;
+  initiatorTracer?: InitiatorTracer;
   stealth?: unknown;
   sessionState?: unknown;
   hookRegistry?: HookRegistry;

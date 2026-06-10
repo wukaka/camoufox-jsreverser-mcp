@@ -298,6 +298,16 @@ export interface InitiatorTracer {
   normalize(initiator: unknown): NormalizedInitiator;
 }
 
+export interface StealthFeature { name: string; description: string }
+export interface StealthPreset { name: string; description: string; features: string[] }
+
+export interface Stealth {
+  listFeatures(): StealthFeature[];
+  listPresets(): StealthPreset[];
+  applyPreset(presetName: string): Promise<{ preset: string; preloadIds: string[] }>;
+  injectCustomScript(source: string): Promise<{ preloadId: string }>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -312,7 +322,7 @@ export interface Capabilities {
   eventMonitor?: EventMonitor;
   performanceProbe?: PerformanceProbe;
   initiatorTracer?: InitiatorTracer;
-  stealth?: unknown;
+  stealth?: Stealth;
   sessionState?: unknown;
   hookRegistry?: HookRegistry;
   workerTopology?: WorkerTopology;

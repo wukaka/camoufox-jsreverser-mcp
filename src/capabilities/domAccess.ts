@@ -82,8 +82,9 @@ export function makeDomAccess(bidi: BidiDriver, scripts: ScriptHost): DomAccess 
         }) as { nodes: Array<{ sharedId: string; [k: string]: unknown }> };
 
         const nodes = r.nodes ?? [];
-        if (nodes.length > 0) {
-          return { sharedId: nodes[0].sharedId };
+        const first = nodes[0];
+        if (first != null) {
+          return { sharedId: first.sharedId };
         }
 
         await new Promise<void>(resolve => setTimeout(resolve, pollMs));

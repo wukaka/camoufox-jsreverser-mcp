@@ -2,11 +2,10 @@ import { BidiDriver } from '../drivers/bidi/BidiDriver.js';
 import { DomAccess, NodeRef, ScriptHost } from './types.js';
 
 /**
- * v1 type() uses synthetic value assignment via scriptHost.evaluate.
- * This is testable without a real browser but does not simulate real key events.
- * M3 will swap this for real input.performActions key sequence once pauseController
- * lands and key mapping tables are available.
- * DONE_WITH_CONCERNS: documented trade-off.
+ * v1 type() uses synthetic value assignment. The element is passed by sharedId
+ * directly through scriptHost.callFunction's `arguments` channel — BiDi's
+ * standard handle for DOM nodes — so no companion preload is needed.
+ * Real key-event simulation (input.performActions per-key) lands in M3.
  */
 async function syntheticType(
   scripts: ScriptHost,
@@ -19,24 +18,25 @@ async function syntheticType(
   const realm = realms.find(r => r.type === 'window');
   if (!realm) throw new Error(`domAccess.type: no window realm found for context ${contextId}`);
 
-  // v1 synthetic: set .value and dispatch input/change events.
-  // Real key-event simulation (input.performActions per-key) deferred to M3.
-  // Note: __bidiSharedIdMap requires a companion preload to be set up by the caller.
-  // Without it the evaluate returns false and is a no-op, which is intentional in v1.
-  const expr = `(() => {
-    const sharedId = ${JSON.stringify(sharedId)};
-    const text = ${JSON.stringify(text)};
-    const clearFirst = ${JSON.stringify(clearFirst)};
-    const el = (typeof __bidiSharedIdMap !== 'undefined' && __bidiSharedIdMap.get(sharedId)) || null;
-    if (!el) return false;
-    if (clearFirst) el.value = '';
-    el.value += text;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  })()`;
-
-  await scripts.evaluate(realm.realmId, expr, { awaitPromise: false });
+  const r = await scripts.callFunction(
+    realm.realmId,
+    `(el, text, clearFirst) => {
+      if (clearFirst) el.value = '';
+      el.value += text;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }`,
+    [
+      { sharedId },
+      { type: 'string', value: text },
+      { type: 'boolean', value: clearFirst },
+    ],
+    { awaitPromise: false },
+  );
+  if (r.exceptionDetails) {
+    const text = (r.exceptionDetails as { text?: string }).text ?? 'unknown';
+    throw new Error(`domAccess.type: ${text}`);
+  }
 }
 
 export function makeDomAccess(bidi: BidiDriver, scripts: ScriptHost): DomAccess {

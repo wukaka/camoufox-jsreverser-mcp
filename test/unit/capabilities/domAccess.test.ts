@@ -68,15 +68,33 @@ describe('domAccess', () => {
     });
   });
 
-  it('type uses synthetic value assignment via scriptHost (v1 behaviour, documented trade-off)', async () => {
+  it('type passes the sharedId as a BiDi node handle to callFunction', async () => {
     const bidi = fakeBidi();
     const scripts = fakeScripts();
-    // v1: sets value + dispatches input/change events via scriptHost.evaluate
-    scripts.evaluate.mockResolvedValue({ result: null });
+    scripts.callFunction.mockResolvedValue({ result: null });
     const dom = makeDomAccess(bidi as any, scripts);
-    await dom.type('ctx-1', 'node-xyz', 'hello');
-    // v1 must call evaluate with the sharedId and value
-    expect(scripts.evaluate).toHaveBeenCalled();
+    await dom.type('ctx-1', 'node-xyz', 'hello', { clearFirst: true });
+    expect(scripts.callFunction).toHaveBeenCalledWith(
+      'realm-window',
+      expect.stringContaining('el.value'),
+      [
+        { sharedId: 'node-xyz' },
+        { type: 'string', value: 'hello' },
+        { type: 'boolean', value: true },
+      ],
+      { awaitPromise: false },
+    );
+  });
+
+  it('type surfaces an evaluate exception as a thrown error', async () => {
+    const bidi = fakeBidi();
+    const scripts = fakeScripts();
+    scripts.callFunction.mockResolvedValue({
+      result: undefined,
+      exceptionDetails: { text: 'el.value setter blew up' },
+    });
+    const dom = makeDomAccess(bidi as any, scripts);
+    await expect(dom.type('ctx-1', 'node-xyz', 'hello')).rejects.toThrow(/setter blew up/);
   });
 
   it('waitFor resolves immediately when query returns a node', async () => {

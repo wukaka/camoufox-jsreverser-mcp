@@ -6,9 +6,15 @@ export interface ScriptHost {
   callFunction(realmId: string, fn: string, args: unknown[], opts?: { awaitPromise?: boolean }): Promise<{ result: unknown; exceptionDetails?: unknown }>;
 }
 
+export interface PreloadInjector {
+  add(script: string, opts?: { contexts?: string[]; sandbox?: string }): Promise<string>;
+  addToWorker(script: string, workerRealmId: string): Promise<{ injectedAt: 'pre-start' | 'post-start' }>;
+  remove(preloadScriptId: string): Promise<void>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
-  preloadInjector?: unknown;
+  preloadInjector?: PreloadInjector;
   networkObserver?: unknown;
   wsObserver?: unknown;
   logSink?: unknown;

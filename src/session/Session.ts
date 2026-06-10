@@ -74,6 +74,7 @@ export class Session {
     const { makeAstAnalyzer } = await import('../capabilities/astAnalyzer.js');
     const { makeCryptoSignatures } = await import('../capabilities/cryptoSignatures.js');
     const { makeLlmProvider } = await import('../capabilities/llmProvider.js');
+    const { makeTaskArtifacts } = await import('../capabilities/taskArtifacts.js');
     const scriptHost = makeScriptHost(this.bidi);
     this.caps.scriptHost = scriptHost;
     const preloadInjector = makePreloadInjector(this.bidi, scriptHost);
@@ -83,6 +84,7 @@ export class Session {
     this.caps.astAnalyzer = makeAstAnalyzer();
     this.caps.cryptoSignatures = makeCryptoSignatures();
     this.caps.llmProvider = makeLlmProvider();
+    this.caps.taskArtifacts = makeTaskArtifacts();
 
     if (opts.stealth === 'auto') {
       try {

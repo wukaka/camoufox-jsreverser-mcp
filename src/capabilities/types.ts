@@ -108,6 +108,13 @@ export interface WorkerTopology {
   listWorkers(): Promise<WorkerInfo[]>;
 }
 
+export interface RuntimePrefs {
+  /** M3 wires real RDP PreferenceActor; M2 stub rejects with PrefsActorUnavailableError. */
+  set(key: string, value: string | number | boolean): Promise<void>;
+  get(key: string): Promise<string | number | boolean | null>;
+  resetAll(): Promise<void>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -130,5 +137,5 @@ export interface Capabilities {
   cryptoSignatures?: unknown;
   llmProvider?: unknown;
   taskArtifacts?: unknown;
-  runtimePrefs?: unknown;
+  runtimePrefs?: RuntimePrefs;
 }

@@ -175,6 +175,55 @@ export interface WsObserver {
   installFrameHook(): string;
 }
 
+export interface BreakpointEntry {
+  bpId: string;
+  bpActor: string;
+  sourceActor: string;
+  sourceUrl: string;
+  line: number;
+  column?: number;
+  actualLine?: number;
+  actualColumn?: number;
+}
+
+export interface PauseInfo {
+  threadActor: string;
+  pauseActor: string;
+  frameActor: string;
+  why: { type: string; [k: string]: unknown };
+  currentFrame: {
+    where?: { source?: { url?: string }; line?: number; column?: number };
+    [k: string]: unknown;
+  };
+}
+
+export interface CallframeResult {
+  value: unknown;
+  exceptionDetails?: unknown;
+}
+
+export interface PauseController {
+  attach(threadActor: string): Promise<void>;
+  isAttached(): boolean;
+
+  setBreakpointByLocation(sourceUrl: string, line: number, column?: number): Promise<BreakpointEntry>;
+  setBreakpointByText(text: string, sourceUrl?: string): Promise<BreakpointEntry>;
+  removeBreakpoint(bpId: string): Promise<void>;
+  listBreakpoints(): BreakpointEntry[];
+
+  pause(): Promise<void>;
+  resume(): Promise<void>;
+  stepOver(): Promise<void>;
+  stepInto(): Promise<void>;
+  stepOut(): Promise<void>;
+
+  getPausedInfo(): PauseInfo | null;
+  evaluateOnCallframe(expression: string): Promise<CallframeResult>;
+
+  freezeCurrent(): Promise<void>;
+  unfreezeCurrent(): Promise<void>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -184,7 +233,7 @@ export interface Capabilities {
   storageAccess?: StorageAccess;
   pageController?: PageController;
   domAccess?: DomAccess;
-  pauseController?: unknown;
+  pauseController?: PauseController;
   objectInspector?: unknown;
   eventMonitor?: unknown;
   performanceProbe?: unknown;

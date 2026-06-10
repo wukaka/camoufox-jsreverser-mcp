@@ -340,6 +340,27 @@ export interface CryptoSignatures {
   listRules(): string[];
 }
 
+export interface LlmCallRequest {
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+  timeoutMs?: number;
+}
+
+export interface LlmCallResponse {
+  text: string;
+  model: string;
+  cached: boolean;
+  usage?: { promptTokens?: number; completionTokens?: number };
+}
+
+export interface LlmProvider {
+  isConfigured(): boolean;
+  providerName(): string | null;
+  call(req: LlmCallRequest): Promise<LlmCallResponse>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -360,7 +381,7 @@ export interface Capabilities {
   workerTopology?: WorkerTopology;
   astAnalyzer?: AstAnalyzer;
   cryptoSignatures?: CryptoSignatures;
-  llmProvider?: unknown;
+  llmProvider?: LlmProvider;
   taskArtifacts?: unknown;
   runtimePrefs?: RuntimePrefs;
 }

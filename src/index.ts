@@ -21,6 +21,7 @@ import { websocketTools } from './tools/websocket/index.js';
 import { workersTools } from './tools/workers/index.js';
 import { debuggerTools } from './tools/debugger/index.js';
 import { prefsTools } from './tools/prefs/index.js';
+import { stealthTools } from './tools/stealth/index.js';
 
 async function main(): Promise<void> {
   const argv = parseArgv(process.argv.slice(2));
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
     ...workersTools,
     ...debuggerTools,
     ...prefsTools,
+    ...stealthTools,
   ]);
 }
 

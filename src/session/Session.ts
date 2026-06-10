@@ -39,6 +39,8 @@ export class Session {
     localByOrigin: Record<string, Record<string, string>>;
     sessionByOrigin: Record<string, Record<string, string>>;
   }> = new Map();
+  activeMonitors: Map<string, { id: string; events: string[]; startedAt: number }> = new Map();
+  activeWorkerRealmId: string | null = null;
 
   bidi!: BidiDriver;
   private rdpFactory: ((port: number) => Promise<RdpDriver>) | null = null;

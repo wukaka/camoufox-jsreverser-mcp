@@ -97,6 +97,17 @@ export interface DomAccess {
   waitFor(contextId: string, selector: string, opts?: { timeoutMs?: number; state?: 'present' | 'visible' }): Promise<NodeRef>;
 }
 
+export interface WorkerInfo {
+  realmId: string;
+  type: 'worker' | 'service-worker';
+  origin: string;
+}
+
+export interface WorkerTopology {
+  /** M2: derives from scriptHost.listRealms(). M3 adds RDP target-watcher backing. */
+  listWorkers(): Promise<WorkerInfo[]>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -114,7 +125,7 @@ export interface Capabilities {
   stealth?: unknown;
   sessionState?: unknown;
   hookRegistry?: unknown;
-  workerTopology?: unknown;
+  workerTopology?: WorkerTopology;
   astAnalyzer?: unknown;
   cryptoSignatures?: unknown;
   llmProvider?: unknown;

@@ -59,6 +59,30 @@ export interface StorageAccess {
   listIndexedDbNames(realmId: string): Promise<string[]>;
 }
 
+export interface BrowsingContextInfo {
+  context: string;
+  url: string;
+  children?: BrowsingContextInfo[];
+  parent?: string | null;
+  userContext?: string;
+  clientWindow?: string;
+  originalOpener?: string | null;
+}
+
+export interface PageController {
+  listContexts(): Promise<BrowsingContextInfo[]>;
+  createPage(opts?: { url?: string; background?: boolean }): Promise<string>;
+  closePage(contextId: string): Promise<void>;
+  activate(contextId: string): Promise<void>;
+  navigate(contextId: string, url: string, wait?: 'none' | 'interactive' | 'complete'): Promise<{ navigation: string | null; url: string }>;
+  reload(contextId: string): Promise<void>;
+  traverseHistory(contextId: string, delta: number): Promise<void>;
+  screenshot(contextId: string, opts?: { format?: object; clip?: object }): Promise<{ data: string }>;
+  print(contextId: string, opts?: object): Promise<{ data: string }>;
+  setViewport(contextId: string, viewport: object | null): Promise<void>;
+  handleUserPrompt(contextId: string, action: 'accept' | 'dismiss', userText?: string): Promise<void>;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -66,7 +90,7 @@ export interface Capabilities {
   wsObserver?: unknown;
   logSink?: LogSink;
   storageAccess?: StorageAccess;
-  pageController?: unknown;
+  pageController?: PageController;
   domAccess?: unknown;
   pauseController?: unknown;
   objectInspector?: unknown;

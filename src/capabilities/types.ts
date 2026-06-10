@@ -106,6 +106,8 @@ export interface WorkerInfo {
 export interface WorkerTopology {
   /** M2: derives from scriptHost.listRealms(). M3 adds RDP target-watcher backing. */
   listWorkers(): Promise<WorkerInfo[]>;
+  /** Subscribe to new-worker events. Returns unsubscribe function. */
+  onWorkerAvailable(cb: (worker: WorkerInfo) => void): () => void;
 }
 
 export interface HookSpec {

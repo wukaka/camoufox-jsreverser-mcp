@@ -23,10 +23,10 @@ export const list_scripts = defineTool<Record<string, never>, { scripts: ScriptI
     const realm = realms.find(r => r.type === 'window');
     if (!realm) return fail(ErrorReason.TargetNotFound, { hint: 'No window realm.' });
     const r = await sh.evaluate(realm.realmId, LIST_SCRIPT, { awaitPromise: false });
-    type RawEntry = { url?: string; name?: string; transferSize?: number; duration?: number };
-    const raw = ((r.result as { value?: RawEntry[] })?.value) ?? [];
+    type ScriptInfoRaw = { url?: string; transferSize?: number; duration?: number };
+    const raw = ((r.result as { value?: ScriptInfoRaw[] })?.value) ?? [];
     const scripts = raw.map(e => ({
-      url: e.url ?? e.name ?? '',
+      url: e.url ?? '',
       transferSize: e.transferSize ?? 0,
       duration: e.duration ?? 0,
     }));

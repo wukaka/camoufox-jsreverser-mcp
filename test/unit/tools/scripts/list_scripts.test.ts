@@ -4,10 +4,12 @@ import { executeTool } from '../../../../src/server/tool-registry.js';
 
 describe('list_scripts', () => {
   it('returns scripts from performance.getEntriesByType("resource") filtered by initiatorType', async () => {
+    // LIST_SCRIPT runs in-browser and maps PerformanceEntry → { url, transferSize, duration }.
+    // We mock the post-map shape (what evaluate would return).
     const sh = {
       evaluate: vi.fn().mockResolvedValue({ result: { value: [
-        { name: 'https://a/a.js', initiatorType: 'script', transferSize: 1024 },
-        { name: 'https://a/b.js', initiatorType: 'script', transferSize: 2048 },
+        { url: 'https://a/a.js', transferSize: 1024, duration: 12.5 },
+        { url: 'https://a/b.js', transferSize: 2048, duration: 24.0 },
       ] } }),
       listRealms: vi.fn().mockResolvedValue([{ realmId: 'r1', origin: 'https://a', type: 'window' }]),
     };

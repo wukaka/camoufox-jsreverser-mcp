@@ -18,7 +18,9 @@ describe('capability: preloadInjector (live)', () => {
     const pi = ff.session.caps.preloadInjector as PreloadInjector;
     const sh = ff.session.caps.scriptHost as ScriptHost;
 
-    const preloadId = await pi.add('() => { window.__preloadInjMarker = "before"; }');
+    // preloadInjector.add accepts a statement body — it wraps it in a function
+    // declaration before passing to BiDi.
+    const preloadId = await pi.add('window.__preloadInjMarker = "before";');
     try {
       const ctx = await firstContext(ff);
       await ff.session.bidi.send('browsingContext.navigate', {

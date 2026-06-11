@@ -71,7 +71,7 @@ export class Session {
     this.bidi = await this.deps.makeBidi(this.endpoints.bidiUrl);
     this.rdpPort = this.endpoints.rdpPort;
 
-    // Wire BiDi-side capabilities required by stealth.
+    // Wire BiDi-side capabilities.
     const { makeScriptHost } = await import('../capabilities/scriptHost.js');
     const { makePreloadInjector } = await import('../capabilities/preloadInjector.js');
     const { makeStealth } = await import('../capabilities/stealth.js');
@@ -79,6 +79,17 @@ export class Session {
     const { makeCryptoSignatures } = await import('../capabilities/cryptoSignatures.js');
     const { makeLlmProvider } = await import('../capabilities/llmProvider.js');
     const { makeTaskArtifacts } = await import('../capabilities/taskArtifacts.js');
+    const { makeNetworkObserver } = await import('../capabilities/networkObserver.js');
+    const { makeLogSink } = await import('../capabilities/logSink.js');
+    const { makeStorageAccess } = await import('../capabilities/storageAccess.js');
+    const { makePageController } = await import('../capabilities/pageController.js');
+    const { makeDomAccess } = await import('../capabilities/domAccess.js');
+    const { makeWsObserver } = await import('../capabilities/wsObserver.js');
+    const { makeHookRegistry } = await import('../capabilities/hookRegistry.js');
+    const { makeWorkerTopology } = await import('../capabilities/workerTopology.js');
+    const { makeInitiatorTracer } = await import('../capabilities/initiatorTracer.js');
+    const { makeRuntimePrefsStub } = await import('../capabilities/runtimePrefs.js');
+
     const scriptHost = makeScriptHost(this.bidi);
     this.caps.scriptHost = scriptHost;
     const preloadInjector = makePreloadInjector(this.bidi, scriptHost);
@@ -89,6 +100,49 @@ export class Session {
     this.caps.cryptoSignatures = makeCryptoSignatures();
     this.caps.llmProvider = makeLlmProvider();
     this.caps.taskArtifacts = makeTaskArtifacts();
+    this.caps.networkObserver = makeNetworkObserver(this.bidi, this.requests);
+    this.caps.logSink = makeLogSink(this.bidi, this.consoleRing);
+    this.caps.storageAccess = makeStorageAccess(this.bidi, scriptHost);
+    this.caps.pageController = makePageController(this.bidi);
+    this.caps.domAccess = makeDomAccess(this.bidi, scriptHost);
+    this.caps.wsObserver = makeWsObserver({
+      bidi: this.bidi,
+      dispatcher: this.dispatcher,
+      table: this.wsTable,
+      emitName: this.emitName,
+    });
+    const workerTopology = makeWorkerTopology(scriptHost);
+    this.caps.workerTopology = workerTopology;
+    this.caps.hookRegistry = makeHookRegistry({
+      dispatcher: this.dispatcher,
+      preload: preloadInjector,
+      table: this.hooks,
+      workers: workerTopology,
+      emitName: this.emitName,
+    });
+    this.caps.initiatorTracer = makeInitiatorTracer();
+    this.caps.runtimePrefs = makeRuntimePrefsStub();
+
+    // Activate the BiDi event streams the capability handlers listen on. Capabilities
+    // attach their own .on() listeners during construction; subscribe() here tells the
+    // BiDi server which events to actually emit. log.entryAdded fuels logSink,
+    // network.* fuels networkObserver, and network.beforeRequestSent is also how
+    // wsObserver detects the WebSocket upgrade handshake.
+    try {
+      await this.bidi.subscribe([
+        'log.entryAdded',
+        'network.beforeRequestSent',
+        'network.responseStarted',
+        'network.responseCompleted',
+        'network.fetchError',
+        'browsingContext.contextCreated',
+        'browsingContext.contextDestroyed',
+        'browsingContext.navigationStarted',
+        'browsingContext.load',
+      ]);
+    } catch {
+      // Subscription failure should not block session init — caps just stay dormant.
+    }
 
     if (opts.stealth === 'auto') {
       try {

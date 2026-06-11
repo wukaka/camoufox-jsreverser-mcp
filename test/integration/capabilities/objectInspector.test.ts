@@ -2,8 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupLive, firstContext, type LiveSession } from './_setup.js';
 import type { PauseController, ObjectInspector, RdpGrip } from '../../../src/capabilities/types.js';
 
-// objectInspector inherits pauseController's Firefox 150 source-stream gap (see that
-// suite's skip note). Re-enable alongside pauseController.
+// objectInspector exercises the paused-thread grip API, which currently relies on
+// the pauseController trigger-pause path. That trigger depends on Firefox 150's
+// new location-resolution semantics for setBreakpoint (the wire-level wiring is
+// proven in pauseController.test.ts; only the column index resolution remains).
+// Re-enable when the trigger-pause path is stable.
 describe.skip('capability: objectInspector (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;

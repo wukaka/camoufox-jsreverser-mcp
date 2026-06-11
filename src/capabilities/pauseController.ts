@@ -15,7 +15,9 @@ interface PausedFrame {
   type: string;
   actor: string;
   why: { type: string; [k: string]: unknown };
-  currentFrame: { actor: string; where?: { source?: { url?: string }; line?: number; column?: number } };
+  /** Firefox 70+ uses `frame`; the legacy `currentFrame` alias is also tolerated. */
+  frame?: { actor: string; where?: { source?: { url?: string }; line?: number; column?: number } };
+  currentFrame?: { actor: string; where?: { source?: { url?: string }; line?: number; column?: number } };
 }
 
 export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): PauseController {
@@ -50,9 +52,11 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
     pauseCtx = {
       threadActor: threadActor!,
       pauseActor: f.actor,
-      frameActor: f.currentFrame?.actor ?? '',
+      frameActor: (f.frame ?? f.currentFrame)?.actor ?? '',
       why: f.why,
-      currentFrame: f.currentFrame,
+      // Surface both keys so callers expecting the legacy `currentFrame` name and
+      // the modern `frame` name both see something useful.
+      currentFrame: (f.frame ?? f.currentFrame) as PauseInfo['currentFrame'],
     };
   }
 
@@ -61,14 +65,37 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
       threadActor = t;
       // Install persistent paused listener before sending attach.
       ee.on(`${t}.paused`, onPausedEvent);
-      await rdp.call(t, { type: 'attach' });
-      // Resume from initial-pause to enter Running state.
-      await rdp.call(t, { type: 'resume' });
+      // Firefox 150 rejects `attach` with no `options` field
+      // ("undefined passed where a value is required"). We send the documented
+      // default-shaped options object — every field stays at its inactive
+      // value so attach does not change any debugger semantics.
+      await rdp.call(t, {
+        type: 'attach',
+        options: {
+          ignoreCaughtExceptions: true,
+          pauseOnExceptions: false,
+          shouldShowOverlay: false,
+          shouldIncludeSavedFrames: false,
+          shouldIncludeAsyncLiveFrames: false,
+          skipBreakpoints: false,
+          logEventBreakpoints: false,
+          breakpoints: {},
+          eventBreakpoints: [],
+        },
+      });
+      // Firefox 150 leaves the thread Running after attach (no initial-pause); the
+      // resume here is a no-op when no pause is outstanding, but still safe to
+      // keep so callers don't accidentally inherit a paused state on older builds.
+      try { await rdp.call(t, { type: 'resume' }); } catch { /* already running */ }
     },
     isAttached() { return threadActor !== null; },
 
     async setBreakpointByLocation(sourceUrl, line, column) {
       if (!threadActor) throw new Error('pauseController: not attached');
+      // Firefox 150 routes setBreakpoint through the thread actor (the legacy
+      // <source>.setBreakpoint packet was removed). We still resolve the source
+      // ahead of time so we can fail fast with noScript when the URL is unknown
+      // and so removeBreakpoint can route through the same location object.
       const sourcesReply = await rdp.call<{ sources: Array<{ actor: string; url: string }> }>(
         threadActor, { type: 'sources' },
       );
@@ -76,26 +103,26 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
       if (!source) {
         throw new BreakpointUnresolvedError('noScript', { sourceUrl, line });
       }
-      const reply = await rdp.call<{ actor?: string; actualLocation?: { line: number; column?: number }; error?: string }>(
-        source.actor,
-        { type: 'setBreakpoint', location: { line, column } },
+      const location = { sourceUrl, line, ...(column !== undefined ? { column } : {}) };
+      const reply = await rdp.call<{ error?: string }>(
+        threadActor,
+        { type: 'setBreakpoint', location, options: {} },
       );
       if (reply.error) {
         throw new BreakpointUnresolvedError(reply.error as 'noScript' | 'noCodeAtLineColumn', { sourceUrl, line });
       }
-      if (!reply.actor) {
-        throw new BreakpointUnresolvedError('noScript', { sourceUrl, line });
-      }
       const bpId = `bp-${randomBytes(4).toString('hex')}`;
+      // Firefox 150 does not return a bp actor; the thread owns the breakpoint
+      // and identifies it by location alone. Keep the bpActor field non-empty so
+      // the public BreakpointEntry shape stays stable; threadActor doubles as
+      // the owner that removeBreakpoint targets.
       const entry: BreakpointEntry = {
         bpId,
-        bpActor: reply.actor,
+        bpActor: threadActor,
         sourceActor: source.actor,
         sourceUrl,
         line,
-        column,
-        actualLine: reply.actualLocation?.line,
-        actualColumn: reply.actualLocation?.column,
+        ...(column !== undefined ? { column } : {}),
       };
       breakpoints.set(bpId, entry);
       return entry;
@@ -118,7 +145,18 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
     async removeBreakpoint(bpId) {
       const entry = breakpoints.get(bpId);
       if (!entry) return;
-      try { await rdp.call(entry.bpActor, { type: 'delete' }); } catch { /* best-effort */ }
+      try {
+        // Firefox 150: thread.removeBreakpoint accepts the same location object as
+        // setBreakpoint. The legacy per-bp-actor 'delete' packet is gone.
+        await rdp.call(entry.bpActor, {
+          type: 'removeBreakpoint',
+          location: {
+            sourceUrl: entry.sourceUrl,
+            line: entry.line,
+            ...(entry.column !== undefined ? { column: entry.column } : {}),
+          },
+        });
+      } catch { /* best-effort */ }
       breakpoints.delete(bpId);
     },
 

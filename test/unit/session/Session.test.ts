@@ -15,6 +15,27 @@ function fakeBidi(overrides: Partial<{ send: ReturnType<typeof vi.fn> }> = {}): 
   };
 }
 
+/** Minimal RDP driver surface needed by Session.ensureRdp + bootstrapRdp. The fake
+ *  resolves every call() with placeholder actor names so bootstrap can build a tree. */
+function fakeRdp(): any {
+  return {
+    awaitGreeting: vi.fn().mockResolvedValue({ from: 'root' }),
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+    close: vi.fn(),
+    call: vi.fn().mockImplementation(async (_actor: string, req: { type: string }) => {
+      switch (req.type) {
+        case 'getRoot':    return { preferenceActor: 'prefActor-1', perfActor: 'perfActor-1' };
+        case 'listTabs':   return { tabs: [{ actor: 'tabDesc-1', selected: true }] };
+        case 'getTarget':  return { frame: { actor: 'targetActor-1', threadActor: 'thread-1' } };
+        case 'getWatcher': return { actor: 'watcher-1' };
+        default:           return {};
+      }
+    }),
+  };
+}
+
 describe('Session', () => {
   it('init in launch mode wires BidiDriver, defers RDP', async () => {
     const launcher = {
@@ -35,7 +56,7 @@ describe('Session', () => {
   it('ensureRdp lazily connects once', async () => {
     const launcher = { launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }), attach: vi.fn(), shutdown: vi.fn() };
     const makeBidi = vi.fn().mockResolvedValue(fakeBidi());
-    const rdp = { close: vi.fn() };
+    const rdp = fakeRdp();
     const makeRdp = vi.fn().mockResolvedValue(rdp);
     const s = new Session({ launcher: launcher as any, makeBidi, makeRdp });
     await s.init({ mode: 'launch' });
@@ -43,6 +64,8 @@ describe('Session', () => {
     const r2 = await s.ensureRdp();
     expect(r1).toBe(r2);
     expect(makeRdp).toHaveBeenCalledTimes(1);
+    // Greeting was consumed exactly once.
+    expect(rdp.awaitGreeting).toHaveBeenCalledTimes(1);
   });
 
   it('emitName is per session random', () => {

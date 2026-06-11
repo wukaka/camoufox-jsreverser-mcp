@@ -3,10 +3,10 @@ import { setupLive, firstContext, type LiveSession } from './_setup.js';
 import { createHash } from 'node:crypto';
 import type { PauseController, ScriptHost } from '../../../src/capabilities/types.js';
 
-// pauseController.attach(threadActor) requires the threadActor returned by
-// `<currentTarget>.attach`. Wiring that needs bootstrapRdp to complete reliably,
-// which is currently flaky on Firefox 150 headless (no target-available-form
-// emit). Re-enable when M7.04 adds a fall-back threadActor discovery path.
+// pauseController is now attached on the bootstrapped thread, but Firefox 150
+// stopped returning pre-existing sources from `threadActor.sources` — sources are
+// streamed via the watcher's `source` resource. setBreakpointByLocation needs to
+// consume that stream before searching. Re-enable when the capability is updated.
 describe.skip('capability: pauseController (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;

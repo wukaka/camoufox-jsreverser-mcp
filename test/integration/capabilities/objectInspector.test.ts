@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupLive, firstContext, type LiveSession } from './_setup.js';
 import type { PauseController, ObjectInspector, RdpGrip } from '../../../src/capabilities/types.js';
 
-// objectInspector exercises the paused-thread API, so it inherits pauseController's
-// threadActor-attach dependency. Re-enable alongside pauseController in M7.04.
+// objectInspector inherits pauseController's Firefox 150 source-stream gap (see that
+// suite's skip note). Re-enable alongside pauseController.
 describe.skip('capability: objectInspector (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;

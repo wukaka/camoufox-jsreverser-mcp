@@ -103,9 +103,9 @@ export async function launchTestFirefox(opts: TestFirefoxOptions = {}): Promise<
         sock.once('connect', () => res());
         sock.once('error', rej);
       });
-      const d = new RdpDriver({ socket: sock as any });
-      d.markConnected();
-      return d;
+      // Session.ensureRdp will awaitGreeting() before issuing any call; markConnected
+      // is harmless but no longer load-bearing here.
+      return new RdpDriver({ socket: sock as any });
     },
   });
 

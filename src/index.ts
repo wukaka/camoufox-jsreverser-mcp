@@ -52,9 +52,8 @@ async function main(): Promise<void> {
     makeRdp: async (rdpPort) => {
       const tcp = createConnection({ host: '127.0.0.1', port: rdpPort });
       await new Promise<void>((res, rej) => { tcp.once('connect', () => res()); tcp.once('error', rej); });
-      const d = new RdpDriver({ socket: tcp as any });
-      d.markConnected();
-      return d;
+      // Session.ensureRdp consumes the server greeting before any RDP call.
+      return new RdpDriver({ socket: tcp as any });
     },
   });
 

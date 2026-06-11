@@ -18,6 +18,8 @@ export interface SessionInitOpts {
   bidiUrl?: string;
   rdpPort?: number;
   stealth?: 'auto' | 'off';
+  /** Spoofed UA, forwarded to launcher.launch when mode='launch'. */
+  userAgentOverride?: string;
 }
 
 export class Session {
@@ -59,7 +61,9 @@ export class Session {
 
   async init(opts: SessionInitOpts): Promise<void> {
     if (opts.mode === 'launch') {
-      this.endpoints = await this.deps.launcher.launch({});
+      this.endpoints = await this.deps.launcher.launch({
+        ...(opts.userAgentOverride ? { userAgentOverride: opts.userAgentOverride } : {}),
+      });
     } else {
       if (!opts.bidiUrl || !opts.rdpPort) throw new Error('attach mode requires bidiUrl + rdpPort');
       this.endpoints = this.deps.launcher.attach({ bidiUrl: opts.bidiUrl, rdpPort: opts.rdpPort });

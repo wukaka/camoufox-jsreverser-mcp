@@ -54,14 +54,21 @@ export class FirefoxLauncher {
         reject(new Error('Firefox startup timeout: no endpoints detected from stderr'));
       }, this.deps.startupTimeoutMs ?? 30000);
 
+      const tryResolve = (): void => {
+        if (!bidiUrl) return;
+        // Recent Firefox builds no longer print the RDP startup banner; trust the port
+        // we asked for via --start-debugger-server once BiDi is up. stderr-detected
+        // value still wins when present (older builds).
+        const port = rdpDetected ?? rdpPort;
+        clearTimeout(timeout);
+        resolve({ bidiUrl, rdpPort: port, profileDir });
+      };
+
       proc.stderr.on('data', (chunk: Buffer) => {
         const s = chunk.toString();
         const bm = s.match(BIDI_RE); if (bm) bidiUrl = bm[1];
         const rm = s.match(RDP_RE);  if (rm) rdpDetected = Number(rm[1]);
-        if (bidiUrl && rdpDetected) {
-          clearTimeout(timeout);
-          resolve({ bidiUrl, rdpPort: rdpDetected, profileDir });
-        }
+        tryResolve();
       });
       proc.on('exit', (code) => {
         clearTimeout(timeout);

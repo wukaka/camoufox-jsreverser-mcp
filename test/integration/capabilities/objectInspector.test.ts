@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupLive, firstContext, type LiveSession } from './_setup.js';
 import type { PauseController, ObjectInspector, RdpGrip } from '../../../src/capabilities/types.js';
 
-// objectInspector requires bootstrapRdp() + a paused thread; re-enable when
-// RDP-side caps are wired in Session.ensureRdp.
+// objectInspector exercises the paused-thread API, so it inherits pauseController's
+// threadActor-attach dependency. Re-enable alongside pauseController in M7.04.
 describe.skip('capability: objectInspector (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;

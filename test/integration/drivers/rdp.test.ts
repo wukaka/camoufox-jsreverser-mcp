@@ -5,10 +5,9 @@ import type { RdpDriver } from '../../../src/drivers/rdp/RdpDriver.js';
 import { bootstrapRdp, type ActorTree } from '../../../src/drivers/rdp/bootstrap.js';
 
 /** Spec §5.2 Layer 2 — real Firefox RDP protocol surface.
- *  Skipped automatically when Firefox / geckodriver are missing. */
-// RDP cases need bootstrapRdp + the M3 RDP-side caps wired through Session.ensureRdp.
-// Camoufox+geckodriver picks an RDP port that we now parse out of the launcher banner,
-// but we still need the capability wiring before these tests can pass end-to-end.
+ *  bootstrapRdp's wait for `<watcher>.target-available-form` does not resolve on
+ *  Firefox 150 headless reliably; re-enable when M7.04 adds a fall-back path that
+ *  pulls the currentTarget descriptor synchronously. */
 describe.skip('RDP driver integration', () => {
   let ff: TestFirefox | null = null;
   let fixture: FixtureServer;

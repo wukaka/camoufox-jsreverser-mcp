@@ -161,6 +161,32 @@ export class Session {
     if (this.rdp) return this.rdp;
     if (!this.rdpPort || !this.rdpFactory) throw new BrowserNotReadyError('RDP factory unavailable');
     this.rdp = await this.rdpFactory(this.rdpPort);
+
+    // pauseController / objectInspector only need the rdp driver itself; wire them
+    // unconditionally since they don't depend on actor discovery.
+    const { makePauseController } = await import('../capabilities/pauseController.js');
+    const { makeObjectInspector } = await import('../capabilities/objectInspector.js');
+    this.caps.pauseController = makePauseController(this.rdp, this.scripts);
+    this.caps.objectInspector = makeObjectInspector(this.rdp);
+
+    // eventMonitor / RDP-aware workerTopology depend on the watcher actor surfaced by
+    // bootstrapRdp. Bootstrap may time out (Firefox 150 does not always emit
+    // target-available-form on the headless tab the test harness opens) — failure is
+    // non-fatal here; BiDi-only workerTopology stays in place and eventMonitor stays
+    // unset. runtimePrefs (real, RDP-backed) + performanceProbe need actor pointers
+    // bootstrapRdp does not return today (preferenceActor sits on the root form,
+    // performanceActor on the currentTarget form); they remain on their M2 stubs.
+    try {
+      const { bootstrapRdp } = await import('../drivers/rdp/bootstrap.js');
+      const { makeEventMonitor } = await import('../capabilities/eventMonitor.js');
+      const { makeRdpWorkerTopology } = await import('../capabilities/workerTopology.js');
+      const tree = await bootstrapRdp(this.rdp, { timeoutMs: 3_000 });
+      this.caps.eventMonitor = makeEventMonitor(this.rdp, tree.watcher);
+      this.caps.workerTopology = makeRdpWorkerTopology(this.rdp, tree.watcher);
+    } catch {
+      // Leave BiDi-only workerTopology in place; eventMonitor remains unset.
+    }
+
     return this.rdp;
   }
 

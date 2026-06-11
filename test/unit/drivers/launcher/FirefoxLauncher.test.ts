@@ -61,11 +61,12 @@ describe('FirefoxLauncher.launch (geckodriver-fronted)', () => {
     });
 
     const p = launcher.launch({ userAgentOverride: 'Mozilla/5.0 spoofed' });
-    // Emit both banners so the launcher proceeds: "Listening on" gates POST /session,
-    // and "Read port:" supplies the RDP port reported by Marionette after Firefox starts.
+    // Emit the two banners the launcher waits on: geckodriver's "Listening on" gates
+    // POST /session, and Firefox's "Started devtools server on <NNN>" tells us which
+    // port the RDP / DevTools server bound.
     setImmediate(() => {
       proc.stderr.emit('data', Buffer.from('1234\tgeckodriver\tINFO\tListening on 127.0.0.1:60000\n'));
-      proc.stderr.emit('data', Buffer.from('Read port: 65001\n'));
+      proc.stderr.emit('data', Buffer.from('Started devtools server on 60001\n'));
     });
     const endpoints = await p;
 
@@ -78,11 +79,15 @@ describe('FirefoxLauncher.launch (geckodriver-fronted)', () => {
     const body = JSON.parse(postedBody);
     expect(body.capabilities.alwaysMatch.browserName).toBe('firefox');
     expect(body.capabilities.alwaysMatch.webSocketUrl).toBe(true);
+    // We pinned the RDP port via -start-debugger-server using the second freePort
+    // allocation; verify it shows up in moz:firefoxOptions.args.
+    expect(body.capabilities.alwaysMatch['moz:firefoxOptions'].args)
+      .toEqual(expect.arrayContaining(['-start-debugger-server', '60001']));
 
     expect(endpoints.bidiUrl).toBe('ws://127.0.0.1:9001/session/sess-123');
     expect(endpoints.sessionId).toBe('sess-123');
     expect(endpoints.geckodriverPort).toBe(60000);
-    expect(endpoints.rdpPort).toBe(65001);
+    expect(endpoints.rdpPort).toBe(60001);
     expect(endpoints.profileDir).toBe('/tmp/cam-profile-x');
   });
 
@@ -107,7 +112,7 @@ describe('FirefoxLauncher.launch (geckodriver-fronted)', () => {
     const p = launcher.launch({ userAgentOverride: 'spoofed-UA' });
     setImmediate(() => {
       proc.stderr.emit('data', Buffer.from('Listening on 127.0.0.1:60100\n'));
-      proc.stderr.emit('data', Buffer.from('Read port: 65100\n'));
+      proc.stderr.emit('data', Buffer.from('Started devtools server on 65100\n'));
     });
     await p;
 
@@ -224,7 +229,7 @@ describe('FirefoxLauncher.shutdown', () => {
     const p = launcher.launch({});
     setImmediate(() => {
       proc.stderr.emit('data', Buffer.from('Listening on 127.0.0.1:60500\n'));
-      proc.stderr.emit('data', Buffer.from('Read port: 65500\n'));
+      proc.stderr.emit('data', Buffer.from('Started devtools server on 65500\n'));
     });
     await p;
     await launcher.shutdown({ sigtermTimeoutMs: 1 });

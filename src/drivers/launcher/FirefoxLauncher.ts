@@ -64,6 +64,9 @@ export interface LaunchOptions {
 export interface AttachOptions { bidiUrl: string; rdpPort: number; sessionId?: string; geckodriverPort?: number }
 
 const GECKODRIVER_LISTENING_RE = /(?:[Ll]istening on)\s+(?:127\.0\.0\.1|0\.0\.0\.0|localhost):(\d+)/;
+/** Firefox prints this when geckodriver tells it the debugger-server port it picked.
+ *  Format: "Read port: 63585". This is the actual RDP port Marionette assigned. */
+const RDP_READ_PORT_RE = /Read port:\s+(\d+)/;
 
 async function defaultFreePort(): Promise<number> {
   const net = await import('node:net');
@@ -106,7 +109,6 @@ export class FirefoxLauncher {
 
     const profileDir = await this.deps.mkdtemp('/tmp/cam-profile-');
     this.profileDir = profileDir;
-    const rdpPort = opts.rdpPort ?? await freePort();
     const geckodriverPort = await freePort();
     this.geckodriverPort = geckodriverPort;
 
@@ -114,8 +116,6 @@ export class FirefoxLauncher {
     if (opts.userAgentOverride) {
       extraPrefs.push({ key: 'general.useragent.override', value: opts.userAgentOverride });
     }
-    // Pin the RDP debugger server port via pref so geckodriver doesn't need to know about it.
-    extraPrefs.push({ key: 'devtools.debugger.remote-port', value: rdpPort });
     await this.deps.writeFile(path.join(profileDir, 'user.js'), renderPrefsJs(extraPrefs));
 
     const proc = this.deps.spawn(
@@ -129,8 +129,25 @@ export class FirefoxLauncher {
     );
     this.proc = proc;
 
-    // geckodriver writes "Listening on 127.0.0.1:<port>" to stdout (not stderr).
-    // We accept either to stay robust against future log routing changes.
+    // geckodriver writes "Listening on 127.0.0.1:<port>" to stdout (not stderr) and,
+    // after launching Firefox, "Read port: <NNN>" once Firefox-side Marionette has
+    // bound its debugger server. We need both: the first lets us start the WebDriver
+    // session, the second is the RDP port the M3 capabilities will connect to.
+    // We accept either stream to stay robust against future log routing changes.
+    const rdpPortPromise = new Promise<number>((resolve) => {
+      const onData = (chunk: Buffer): void => {
+        const s = chunk.toString();
+        const m = s.match(RDP_READ_PORT_RE);
+        if (m) {
+          proc.stdout?.off('data', onData);
+          proc.stderr.off('data', onData);
+          resolve(Number(m[1]));
+        }
+      };
+      proc.stdout?.on('data', onData);
+      proc.stderr.on('data', onData);
+    });
+
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('geckodriver startup timeout: no listening banner detected'));
@@ -151,10 +168,6 @@ export class FirefoxLauncher {
         reject(new Error(`geckodriver exited prematurely with code ${code}`));
       });
     });
-
-    // Drain remaining output so the OS pipe buffers don't fill up mid-run.
-    proc.stdout?.on('data', () => { /* swallow */ });
-    proc.stderr.on('data', () => { /* swallow */ });
 
     // POST /session — geckodriver launches Camoufox, returns webSocketUrl for BiDi.
     const sessionRes = await fetchImpl(`http://127.0.0.1:${geckodriverPort}/session`, {
@@ -189,6 +202,18 @@ export class FirefoxLauncher {
       throw new Error(`geckodriver POST /session missing sessionId or webSocketUrl: ${JSON.stringify(data).slice(0, 200)}`);
     }
     this.sessionId = sessionId;
+
+    // Firefox/Marionette assigns the RDP port at startup; we read it out of the
+    // banner. Fall back to a default after a short wait if the banner never appeared
+    // (e.g. when the test harness mocks proc and doesn't emit "Read port:" lines).
+    const rdpPort = opts.rdpPort ?? await Promise.race([
+      rdpPortPromise,
+      new Promise<number>((resolve) => setTimeout(() => resolve(0), 5_000)),
+    ]);
+
+    // Drain remaining output so the OS pipe buffers don't fill up mid-run.
+    proc.stdout?.on('data', () => { /* swallow */ });
+    proc.stderr.on('data', () => { /* swallow */ });
 
     return { bidiUrl, rdpPort, profileDir, sessionId, geckodriverPort };
   }

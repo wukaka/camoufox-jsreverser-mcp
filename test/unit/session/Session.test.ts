@@ -1,6 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Session } from '../../../src/session/Session.js';
 
+/** Build a fake BiDi driver with the EventEmitter surface that capability factories
+ *  exercise during Session.init (on / off / emit / subscribe / send / close). */
+function fakeBidi(overrides: Partial<{ send: ReturnType<typeof vi.fn> }> = {}): any {
+  return {
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+    subscribe: vi.fn().mockResolvedValue(undefined),
+    unsubscribe: vi.fn().mockResolvedValue(undefined),
+    send: overrides.send ?? vi.fn().mockResolvedValue({}),
+    close: vi.fn(),
+  };
+}
+
 describe('Session', () => {
   it('init in launch mode wires BidiDriver, defers RDP', async () => {
     const launcher = {
@@ -8,7 +22,7 @@ describe('Session', () => {
       attach: vi.fn(),
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
-    const bidi = { close: vi.fn() };
+    const bidi = fakeBidi();
     const makeBidi = vi.fn().mockResolvedValue(bidi);
     const makeRdp = vi.fn().mockResolvedValue({ close: vi.fn() });
     const s = new Session({ launcher: launcher as any, makeBidi, makeRdp });
@@ -20,7 +34,7 @@ describe('Session', () => {
 
   it('ensureRdp lazily connects once', async () => {
     const launcher = { launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }), attach: vi.fn(), shutdown: vi.fn() };
-    const makeBidi = vi.fn().mockResolvedValue({ close: vi.fn() });
+    const makeBidi = vi.fn().mockResolvedValue(fakeBidi());
     const rdp = { close: vi.fn() };
     const makeRdp = vi.fn().mockResolvedValue(rdp);
     const s = new Session({ launcher: launcher as any, makeBidi, makeRdp });
@@ -50,7 +64,7 @@ describe('Session', () => {
       attach: vi.fn(),
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
-    const bidi = { close: vi.fn() };
+    const bidi = fakeBidi();
     const s = new Session({ launcher: launcher as any, makeBidi: vi.fn().mockResolvedValue(bidi), makeRdp: vi.fn() });
     await s.init({ mode: 'launch' });
     await s.shutdown();
@@ -62,14 +76,13 @@ describe('Session', () => {
   it('init with stealth=auto wires caps and applies firefox-default preset', async () => {
     // mock bidi.send to record the preload call
     const bidiSends: Array<{ method: string; params: unknown }> = [];
-    const bidi = {
+    const bidi = fakeBidi({
       send: vi.fn().mockImplementation(async (method: string, params: unknown) => {
         bidiSends.push({ method, params });
         if (method === 'script.addPreloadScript') return { script: 'preload-1' };
         return {};
       }),
-      close: vi.fn(),
-    };
+    });
     const launcher = {
       launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }),
       attach: vi.fn(), shutdown: vi.fn(),
@@ -89,13 +102,12 @@ describe('Session', () => {
 
   it('init with stealth=off wires caps but does NOT apply preset', async () => {
     const bidiSends: Array<{ method: string }> = [];
-    const bidi = {
+    const bidi = fakeBidi({
       send: vi.fn().mockImplementation(async (method: string) => {
         bidiSends.push({ method });
         return {};
       }),
-      close: vi.fn(),
-    };
+    });
     const launcher = {
       launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }),
       attach: vi.fn(), shutdown: vi.fn(),
@@ -108,13 +120,12 @@ describe('Session', () => {
   });
 
   it('init records stealthApplyError when preset apply throws', async () => {
-    const bidi = {
+    const bidi = fakeBidi({
       send: vi.fn().mockImplementation(async (method: string) => {
         if (method === 'script.addPreloadScript') throw new Error('boom');
         return {};
       }),
-      close: vi.fn(),
-    };
+    });
     const launcher = {
       launch: vi.fn().mockResolvedValue({ bidiUrl: 'ws://x', rdpPort: 6000, profileDir: '/tmp/x' }),
       attach: vi.fn(), shutdown: vi.fn(),

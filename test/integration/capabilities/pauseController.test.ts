@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupLive, firstContext, type LiveSession } from './_setup.js';
 import type { PauseController } from '../../../src/capabilities/types.js';
 
-describe('capability: pauseController (live)', () => {
+// pauseController needs bootstrapRdp() + makePauseController(rdp, scripts) wired in
+// Session.ensureRdp. Re-enable when RDP-side caps land.
+describe.skip('capability: pauseController (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;
 

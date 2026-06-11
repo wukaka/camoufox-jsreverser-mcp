@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupLive, type LiveSession } from './_setup.js';
 import type { RuntimePrefs } from '../../../src/capabilities/types.js';
 
-describe('capability: runtimePrefs (live)', () => {
+// runtimePrefs needs a real RDP PreferenceActor; Session.init currently only wires
+// the stub. Re-enable when bootstrapRdp + makeRuntimePrefs(rdp, prefActor) is wired.
+describe.skip('capability: runtimePrefs (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;
 

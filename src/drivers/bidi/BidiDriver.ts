@@ -27,8 +27,13 @@ export class BidiDriver extends EventEmitter {
     super();
     this.socket = opts.socket;
     this.timeoutMs = opts.timeoutMs ?? 30000;
-    this.socket.on('message', (raw: { data: string } | string) => {
-      const data = typeof raw === 'string' ? raw : raw.data;
+    this.socket.on('message', (raw: { data: string } | string | Buffer | ArrayBuffer | Uint8Array) => {
+      let data: string;
+      if (typeof raw === 'string') data = raw;
+      else if (raw instanceof Buffer) data = raw.toString('utf8');
+      else if (raw instanceof Uint8Array) data = Buffer.from(raw).toString('utf8');
+      else if (raw instanceof ArrayBuffer) data = Buffer.from(raw).toString('utf8');
+      else data = (raw as { data: string }).data;
       this.onMessage(data);
     });
     this.socket.on('close', () => this.onClose());

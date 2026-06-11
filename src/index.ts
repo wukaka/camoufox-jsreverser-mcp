@@ -25,15 +25,21 @@ import { stealthTools } from './tools/stealth/index.js';
 import { aiAstTools } from './tools/ai-ast/index.js';
 import { rebuildTools } from './tools/rebuild/index.js';
 
+const DEFAULT_CAMOUFOX = '/Applications/Camoufox.app/Contents/MacOS/camoufox';
+const DEFAULT_GECKODRIVER = '/usr/local/bin/geckodriver';
+
 async function main(): Promise<void> {
   const argv = parseArgv(process.argv.slice(2));
+  const camoufoxPath = argv.camoufoxPath ?? process.env['CAMOUFOX_PATH'] ?? DEFAULT_CAMOUFOX;
+  const geckodriverPath = argv.geckodriverPath ?? process.env['GECKODRIVER_PATH'] ?? DEFAULT_GECKODRIVER;
 
   const launcher = new FirefoxLauncher({
     spawn: spawn as any,
     mkdtemp: (p: string) => fs.mkdtemp(p),
     writeFile: (p: string, c: string) => fs.writeFile(p, c, 'utf8'),
     rm: (p: string, opts) => fs.rm(p, opts),
-    firefoxPath: argv.firefoxPath ?? process.env['FIREFOX_PATH'] ?? 'firefox',
+    camoufoxPath,
+    geckodriverPath,
   });
 
   const session = new Session({
@@ -57,6 +63,7 @@ async function main(): Promise<void> {
     bidiUrl: argv.bidiUrl,
     rdpPort: argv.rdpPort,
     stealth: argv.stealth,
+    ...(argv.userAgent ? { userAgentOverride: argv.userAgent } : {}),
   });
 
   await startServer(session, [

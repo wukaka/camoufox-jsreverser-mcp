@@ -12,26 +12,32 @@ function fakeRdp(): FakeRdp {
 }
 
 describe('pauseController', () => {
-  it('attach sends thread `attach` and resumes from initial-pause', async () => {
+  it('attach sends thread `attach` with the documented options object then resumes', async () => {
     const rdp = fakeRdp();
-    // attach reply
-    rdp.call.mockResolvedValueOnce({ from: 'thread-1', type: 'paused', why: { type: 'attached' }, actor: 'pause-init' });
-    // resume reply (transition out of initial pause)
-    rdp.call.mockResolvedValueOnce({ from: 'thread-1', type: 'resumed' });
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });   // attach reply
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1', type: 'resumed' });  // resume reply
     const pc = makePauseController(rdp as any, new ScriptCache());
     await pc.attach('thread-1');
     expect(pc.isAttached()).toBe(true);
-    expect(rdp.call).toHaveBeenNthCalledWith(1, 'thread-1', { type: 'attach' });
+    // Firefox 150 rejects `attach` without options.
+    const [actor1, req1] = rdp.call.mock.calls[0];
+    expect(actor1).toBe('thread-1');
+    expect(req1.type).toBe('attach');
+    expect(req1.options).toEqual(expect.objectContaining({
+      ignoreCaughtExceptions: true,
+      pauseOnExceptions: false,
+      breakpoints: {},
+      eventBreakpoints: [],
+    }));
     expect(rdp.call).toHaveBeenNthCalledWith(2, 'thread-1', { type: 'resume' });
   });
 
-  it('setBreakpointByLocation walks getSources, finds source actor, calls setBreakpoint', async () => {
+  it('setBreakpointByLocation pre-resolves the source then routes setBreakpoint through the thread actor', async () => {
     const rdp = fakeRdp();
     rdp.call
-      .mockResolvedValueOnce({ from: 'thread-1', type: 'paused', why: { type: 'attached' }, actor: 'p0' })
-      .mockResolvedValueOnce({ from: 'thread-1', type: 'resumed' });
+      .mockResolvedValueOnce({ from: 'thread-1' })   // attach
+      .mockResolvedValueOnce({ from: 'thread-1' });  // resume
 
-    // getSources
     rdp.call.mockResolvedValueOnce({
       from: 'thread-1',
       sources: [
@@ -39,23 +45,19 @@ describe('pauseController', () => {
         { actor: 'src-2', url: 'https://a/y.js' },
       ],
     });
-    // setBreakpoint reply
-    rdp.call.mockResolvedValueOnce({
-      from: 'src-1',
-      actor: 'bp-1',
-      actualLocation: { line: 12, column: 4 },
-    });
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });  // setBreakpoint reply
 
     const pc = makePauseController(rdp as any, new ScriptCache());
     await pc.attach('thread-1');
     const bp = await pc.setBreakpointByLocation('https://a/x.js', 10);
-    expect(bp.bpActor).toBe('bp-1');
     expect(bp.sourceActor).toBe('src-1');
-    expect(bp.actualLine).toBe(12);
+    // Firefox 150 no longer returns a bp actor; threadActor doubles as the owner.
+    expect(bp.bpActor).toBe('thread-1');
     expect(pc.listBreakpoints()).toHaveLength(1);
-    expect(rdp.call).toHaveBeenLastCalledWith('src-1', {
+    expect(rdp.call).toHaveBeenLastCalledWith('thread-1', {
       type: 'setBreakpoint',
-      location: { line: 10, column: undefined },
+      location: { sourceUrl: 'https://a/x.js', line: 10 },
+      options: {},
     });
   });
 
@@ -74,21 +76,24 @@ describe('pauseController', () => {
     await expect(pc.setBreakpointByLocation('https://missing/x.js', 1)).rejects.toThrow();
   });
 
-  it('removeBreakpoint deletes by id and calls bp.delete', async () => {
+  it('removeBreakpoint sends thread.removeBreakpoint with the same location object', async () => {
     const rdp = fakeRdp();
     rdp.call
-      .mockResolvedValueOnce({ from: 'thread-1', type: 'paused', why: { type: 'attached' }, actor: 'p0' })
-      .mockResolvedValueOnce({ from: 'thread-1', type: 'resumed' })
+      .mockResolvedValueOnce({ from: 'thread-1' })  // attach
+      .mockResolvedValueOnce({ from: 'thread-1' })  // resume
       .mockResolvedValueOnce({ from: 'thread-1', sources: [{ actor: 'src-1', url: 'https://a' }] })
-      .mockResolvedValueOnce({ from: 'src-1', actor: 'bp-1', actualLocation: { line: 1 } })
-      .mockResolvedValueOnce({ from: 'bp-1' });
+      .mockResolvedValueOnce({ from: 'thread-1' })  // setBreakpoint
+      .mockResolvedValueOnce({ from: 'thread-1' }); // removeBreakpoint
 
     const pc = makePauseController(rdp as any, new ScriptCache());
     await pc.attach('thread-1');
     const bp = await pc.setBreakpointByLocation('https://a', 1);
     await pc.removeBreakpoint(bp.bpId);
     expect(pc.listBreakpoints()).toHaveLength(0);
-    expect(rdp.call).toHaveBeenLastCalledWith('bp-1', { type: 'delete' });
+    expect(rdp.call).toHaveBeenLastCalledWith('thread-1', {
+      type: 'removeBreakpoint',
+      location: { sourceUrl: 'https://a', line: 1 },
+    });
   });
 
   it('pause issues interrupt and records PauseInfo on paused event', async () => {

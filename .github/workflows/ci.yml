@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Lint + Typecheck + Unit (Node 20)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+
+  integration:
+    name: Integration (Firefox ${{ matrix.firefox }})
+    runs-on: ubuntu-latest
+    needs: unit
+    strategy:
+      fail-fast: false
+      matrix:
+        firefox: ['latest', 'latest-esr']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install Firefox
+        uses: browser-actions/setup-firefox@v1
+        with:
+          firefox-version: ${{ matrix.firefox }}
+      - name: Install geckodriver
+        uses: browser-actions/setup-geckodriver@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: npm ci
+      - run: npm run build
+      - name: Locate Firefox binary
+        id: firefox
+        run: |
+          which firefox || true
+          echo "path=$(which firefox)" >> "$GITHUB_OUTPUT"
+      - name: Locate geckodriver
+        id: gecko
+        run: |
+          which geckodriver || true
+          echo "path=$(which geckodriver)" >> "$GITHUB_OUTPUT"
+      - run: npm run test:integration
+        env:
+          FIREFOX_PATH: ${{ steps.firefox.outputs.path }}
+          GECKODRIVER_PATH: ${{ steps.gecko.outputs.path }}
+
+  e2e:
+    name: E2E (Firefox ${{ matrix.firefox }})
+    runs-on: ubuntu-latest
+    needs: unit
+    strategy:
+      fail-fast: false
+      matrix:
+        firefox: ['latest', 'latest-esr']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install Firefox
+        uses: browser-actions/setup-firefox@v1
+        with:
+          firefox-version: ${{ matrix.firefox }}
+      - name: Install geckodriver
+        uses: browser-actions/setup-geckodriver@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: npm ci
+      - run: npm run build
+      - name: Locate Firefox binary
+        id: firefox
+        run: |
+          which firefox || true
+          echo "path=$(which firefox)" >> "$GITHUB_OUTPUT"
+      - name: Locate geckodriver
+        id: gecko
+        run: |
+          which geckodriver || true
+          echo "path=$(which geckodriver)" >> "$GITHUB_OUTPUT"
+      - run: npm run test:e2e
+        env:
+          FIREFOX_PATH: ${{ steps.firefox.outputs.path }}
+          GECKODRIVER_PATH: ${{ steps.gecko.outputs.path }}

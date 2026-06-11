@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fixture-xhr-pause</title>
+</head>
+<body>
+<h1>fixture-xhr-pause</h1>
+<button id="go">Fetch</button>
+<pre id="out"></pre>
+<script src="/sign.js"></script>
+<script>
+  document.getElementById('go').addEventListener('click', async () => {
+    const sig = window.computeSig({ ts: Date.now() });
+    const res = await fetch('/api/secret', { headers: { 'x-sig': sig } });
+    const data = await res.json();
+    document.getElementById('out').textContent = JSON.stringify({ sig, server: data });
+  });
+</script>
+</body>
+</html>

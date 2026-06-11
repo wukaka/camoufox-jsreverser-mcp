@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>probe-webdriver</title>
+</head>
+<body>
+<h1>probe-webdriver</h1>
+<div id="result"></div>
+<script>
+  const data = {
+    webdriver: navigator.webdriver,
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    languages: navigator.languages,
+    pluginsCount: navigator.plugins && navigator.plugins.length,
+  };
+  document.getElementById('result').textContent = JSON.stringify(data);
+  document.getElementById('result').dataset.webdriver = String(navigator.webdriver);
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fixture-sig</title>
+</head>
+<body>
+<h1>fixture-sig</h1>
+<form id="f">
+  <input id="user" value="alice">
+  <input id="amount" value="100">
+  <button type="submit" id="go">Submit</button>
+</form>
+<pre id="out"></pre>
+<script>
+  function computeSig(payload) {
+    return btoa(JSON.stringify(payload));
+  }
+  document.getElementById('f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      user: document.getElementById('user').value,
+      amount: Number(document.getElementById('amount').value),
+    };
+    const sig = computeSig(payload);
+    const res = await fetch('/api/secret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-sig': sig },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    document.getElementById('out').textContent = JSON.stringify({ sig, server: data });
+  });
+</script>
+</body>
+</html>

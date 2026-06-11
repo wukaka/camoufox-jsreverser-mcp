@@ -75,6 +75,7 @@ export class Session {
     const { makeScriptHost } = await import('../capabilities/scriptHost.js');
     const { makePreloadInjector } = await import('../capabilities/preloadInjector.js');
     const { makeStealth } = await import('../capabilities/stealth.js');
+    const { makeStealthHook } = await import('../capabilities/stealthHook.js');
     const { makeAstAnalyzer } = await import('../capabilities/astAnalyzer.js');
     const { makeCryptoSignatures } = await import('../capabilities/cryptoSignatures.js');
     const { makeLlmProvider } = await import('../capabilities/llmProvider.js');
@@ -96,6 +97,7 @@ export class Session {
     this.caps.preloadInjector = preloadInjector;
     const stealth = makeStealth(preloadInjector);
     this.caps.stealth = stealth;
+    this.caps.stealthHook = makeStealthHook();
     this.caps.astAnalyzer = makeAstAnalyzer();
     this.caps.cryptoSignatures = makeCryptoSignatures();
     this.caps.llmProvider = makeLlmProvider();

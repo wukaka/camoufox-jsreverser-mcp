@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>strict-csp</title>
+</head>
+<body>
+<h1>strict-csp</h1>
+<div id="result"></div>
+<script>
+  // With a strict default-src 'self' policy, this inline script will be blocked
+  // unless CSP is bypassed (e.g. via browsingContext.setBypassCSP).
+  document.getElementById('result').textContent = 'inline-ran';
+  document.getElementById('result').dataset.inlineRan = '1';
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>obfuscated-aes</title>
+</head>
+<body>
+<h1>obfuscated-aes</h1>
+<pre id="out"></pre>
+<script>
+  // Deliberately obfuscation-shaped: string-array decryption + AES sbox constants.
+  // Detect-able by cryptoSignatures (AES) and trigger-able by the constant-fold transform.
+  var _0x = ['CryptoJS.AES.encrypt', '0x63', '0x7c', '0x77', '0x7b', 'SubBytes', 'MixColumns'];
+  function _0xfn(idx) { return _0x[idx]; }
+  var sbox = [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5];
+  var dead = (function () { return false; })() ? 'unreachable' : 'live';
+  var folded = 1 + 2 + 3;
+  document.getElementById('out').textContent = JSON.stringify({
+    label: _0xfn(0),
+    sboxLen: sbox.length,
+    dead: dead,
+    folded: folded,
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fixture-ws</title>
+</head>
+<body>
+<h1>fixture-ws</h1>
+<button id="connect">Connect</button>
+<button id="send">Send base64 frame</button>
+<pre id="out"></pre>
+<script>
+  let ws = null;
+  const out = document.getElementById('out');
+  function log(line) {
+    out.textContent += line + '\n';
+  }
+  document.getElementById('connect').addEventListener('click', () => {
+    const wsUrl = new URL('/ws', location.href);
+    wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(wsUrl.toString());
+    ws.addEventListener('open', () => log('open'));
+    ws.addEventListener('message', (ev) => log('recv:' + ev.data));
+  });
+  document.getElementById('send').addEventListener('click', () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const payload = btoa(JSON.stringify({ kind: 'ping', ts: Date.now() }));
+    ws.send(payload);
+    log('send:' + payload);
+  });
+</script>
+</body>
+</html>

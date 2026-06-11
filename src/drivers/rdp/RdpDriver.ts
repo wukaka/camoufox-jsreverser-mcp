@@ -35,6 +35,12 @@ export class RdpDriver extends EventEmitter {
   private timeoutMs: number;
   private connected = false;
   private closed = false;
+  /** First frame from the server is a greeting (`{from:'root', applicationType:...}`).
+   *  We must consume it before issuing any request, otherwise it would race the first
+   *  call and be mis-attributed as that call's reply (Mozilla RDP has no per-message id;
+   *  responses are matched by FIFO order per `from` actor). */
+  private greeting: Record<string, unknown> | null = null;
+  private greetingWaiters: Array<(g: Record<string, unknown>) => void> = [];
 
   constructor(opts: RdpDriverOpts) {
     super();
@@ -48,6 +54,25 @@ export class RdpDriver extends EventEmitter {
 
   markConnected(): void { this.connected = true; }
   isConnected(): boolean { return this.connected && !this.closed; }
+
+  /** Resolve when the server greeting arrives. Marks the driver connected as a side
+   *  effect so callers can `await rdp.awaitGreeting()` and immediately `rdp.call(...)`. */
+  awaitGreeting(timeoutMs = 5_000): Promise<Record<string, unknown>> {
+    if (this.greeting) return Promise.resolve(this.greeting);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const idx = this.greetingWaiters.indexOf(resolveOnce);
+        if (idx >= 0) this.greetingWaiters.splice(idx, 1);
+        reject(new DriverTimeoutError('rdp greeting'));
+      }, timeoutMs);
+      const resolveOnce = (g: Record<string, unknown>): void => {
+        clearTimeout(timer);
+        this.connected = true;
+        resolve(g);
+      };
+      this.greetingWaiters.push(resolveOnce);
+    });
+  }
 
   call<T = unknown>(actor: string, request: object): Promise<T> {
     if (this.closed) return Promise.reject(new DriverDisconnectedError());
@@ -133,9 +158,18 @@ export class RdpDriver extends EventEmitter {
     }
   }
 
-  private onFrame(frame: { from?: string; error?: string; message?: string; type?: string; [k: string]: unknown }): void {
+  private onFrame(frame: { from?: string; error?: string; message?: string; type?: string; applicationType?: string; [k: string]: unknown }): void {
     const from = frame.from;
     if (!from) return;
+    // First-ever frame is always the server greeting (`from='root'`, no in-flight
+    // request, has `applicationType`). Capture it and notify any awaitGreeting()
+    // listeners — DO NOT match it to any pending call.
+    if (!this.greeting && from === 'root' && frame.applicationType !== undefined) {
+      this.greeting = frame as Record<string, unknown>;
+      const waiters = this.greetingWaiters.splice(0);
+      for (const w of waiters) w(this.greeting);
+      return;
+    }
     const pending = this.activePending.get(from);
     // Replies have NO `type` field; notifications carry one.
     if (pending && !frame.type) {

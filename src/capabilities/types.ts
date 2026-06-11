@@ -384,6 +384,34 @@ export interface TaskArtifacts {
   taskRoot(taskId: string): string;
 }
 
+export interface StealthHookWrapSpec {
+  /** Dotted global path to wrap, e.g. "window.fetch" or "XMLHttpRequest.prototype.open". */
+  targetPath: string;
+  /** Channel suffix appended to dispatcher messages so the consumer can multiplex. */
+  channelName?: string;
+  /** Sample fields to capture: 'args' | 'return' | 'this' | 'stack'. */
+  capture?: Array<'args' | 'return' | 'this' | 'stack'>;
+}
+
+export interface StealthHookPreloadSpec {
+  emitName: string;
+  /** Wraps to install. Each renders an IIFE inside the same preload payload. */
+  wraps?: StealthHookWrapSpec[];
+  /** Whether to install the performance.now / Date.now smoother. */
+  neutraliseTiming?: boolean;
+  /** Soft cap on per-call hook latency credit when neutralising timing. */
+  timingMaxGapMs?: number;
+}
+
+export interface StealthHook {
+  /** Pure renderer: returns JS source ready for preloadInjector.add(). */
+  renderPreload(spec: StealthHookPreloadSpec): string;
+  /** Convenience renderer for a single wrap. */
+  wrapNative(spec: StealthHookWrapSpec & { emitName: string }): string;
+  /** Convenience renderer for the timing-smoother fragment. */
+  neutraliseTiming(opts?: { maxGapMs?: number }): string;
+}
+
 export interface Capabilities {
   scriptHost?: ScriptHost;
   preloadInjector?: PreloadInjector;
@@ -407,4 +435,5 @@ export interface Capabilities {
   llmProvider?: LlmProvider;
   taskArtifacts?: TaskArtifacts;
   runtimePrefs?: RuntimePrefs;
+  stealthHook?: StealthHook;
 }

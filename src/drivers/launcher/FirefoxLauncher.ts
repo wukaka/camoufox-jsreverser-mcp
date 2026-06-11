@@ -64,9 +64,14 @@ export interface LaunchOptions {
 export interface AttachOptions { bidiUrl: string; rdpPort: number; sessionId?: string; geckodriverPort?: number }
 
 const GECKODRIVER_LISTENING_RE = /(?:[Ll]istening on)\s+(?:127\.0\.0\.1|0\.0\.0\.0|localhost):(\d+)/;
-/** Firefox prints this when geckodriver tells it the debugger-server port it picked.
- *  Format: "Read port: 63585". This is the actual RDP port Marionette assigned. */
-const RDP_READ_PORT_RE = /Read port:\s+(\d+)/;
+/** "Read port: <NNN>" is the Marionette automation port Firefox writes after it picks
+ *  one. geckodriver consumes this and we don't need it ourselves, but we still look at
+ *  the line because it gates "the rest of the startup chatter has begun". */
+const MARIONETTE_READ_PORT_RE = /Read port:\s+(\d+)/;
+/** "Started devtools server on <NNN>" is the Mozilla DevTools (RDP) port. This is
+ *  what M3 capabilities talk to over the length-prefixed JSON framing. We need the
+ *  RDP server alongside Marionette because geckodriver only fronts the latter. */
+const RDP_DEVTOOLS_RE = /Started devtools server on (\d+)/;
 
 async function defaultFreePort(): Promise<number> {
   const net = await import('node:net');
@@ -111,6 +116,10 @@ export class FirefoxLauncher {
     this.profileDir = profileDir;
     const geckodriverPort = await freePort();
     this.geckodriverPort = geckodriverPort;
+    // Pre-allocate the DevTools / RDP port so we can pass it to Firefox via
+    // --start-debugger-server. Marionette gets its own port (chosen by Firefox; we
+    // only watch it for diagnostics) — those two ports must NOT be the same.
+    const requestedRdpPort = opts.rdpPort ?? await freePort();
 
     const extraPrefs = [...(opts.extraPrefs ?? [])];
     if (opts.userAgentOverride) {
@@ -131,13 +140,15 @@ export class FirefoxLauncher {
 
     // geckodriver writes "Listening on 127.0.0.1:<port>" to stdout (not stderr) and,
     // after launching Firefox, "Read port: <NNN>" once Firefox-side Marionette has
-    // bound its debugger server. We need both: the first lets us start the WebDriver
-    // session, the second is the RDP port the M3 capabilities will connect to.
-    // We accept either stream to stay robust against future log routing changes.
+    // bound its automation port (which geckodriver consumes), then later "Started
+    // devtools server on <NNN>" once Firefox has bound the Mozilla DevTools / RDP
+    // port we asked for via --start-debugger-server. We need the DevTools port for
+    // every M3 RDP capability. Watch both streams to stay robust against future log
+    // routing changes.
     const rdpPortPromise = new Promise<number>((resolve) => {
       const onData = (chunk: Buffer): void => {
         const s = chunk.toString();
-        const m = s.match(RDP_READ_PORT_RE);
+        const m = s.match(RDP_DEVTOOLS_RE);
         if (m) {
           proc.stdout?.off('data', onData);
           proc.stderr.off('data', onData);
@@ -147,6 +158,9 @@ export class FirefoxLauncher {
       proc.stdout?.on('data', onData);
       proc.stderr.on('data', onData);
     });
+    // Suppress the unused-binding warning in environments where the Marionette
+    // banner is interesting only for diagnostics.
+    void MARIONETTE_READ_PORT_RE;
 
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -180,11 +194,16 @@ export class FirefoxLauncher {
             webSocketUrl: true,
             acceptInsecureCerts: true,
             'moz:firefoxOptions': {
-              args: ['-profile', profileDir, ...(opts.extraArgs ?? [])],
+              args: [
+                '-profile', profileDir,
+                '-start-debugger-server', String(requestedRdpPort),
+                ...(opts.extraArgs ?? []),
+              ],
               prefs: {
                 'devtools.debugger.remote-enabled': true,
                 'devtools.debugger.prompt-connection': false,
                 'devtools.chrome.enabled': true,
+                'devtools.debugger.force-local': true,
               },
             },
           },
@@ -203,12 +222,13 @@ export class FirefoxLauncher {
     }
     this.sessionId = sessionId;
 
-    // Firefox/Marionette assigns the RDP port at startup; we read it out of the
-    // banner. Fall back to a default after a short wait if the banner never appeared
-    // (e.g. when the test harness mocks proc and doesn't emit "Read port:" lines).
-    const rdpPort = opts.rdpPort ?? await Promise.race([
+    // We asked Firefox to bind the DevTools / RDP server on `requestedRdpPort` via
+    // -start-debugger-server. The "Started devtools server on <NNN>" banner confirms
+    // it (and lets us recover if Firefox ever overrides our choice). If the banner
+    // never arrives we still trust our pinned value.
+    const rdpPort = await Promise.race([
       rdpPortPromise,
-      new Promise<number>((resolve) => setTimeout(() => resolve(0), 5_000)),
+      new Promise<number>((resolve) => setTimeout(() => resolve(requestedRdpPort), 8_000)),
     ]);
 
     // Drain remaining output so the OS pipe buffers don't fill up mid-run.

@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupLive, firstContext, type LiveSession } from './_setup.js';
-import type { PauseController } from '../../../src/capabilities/types.js';
+import { createHash } from 'node:crypto';
+import type { PauseController, ScriptHost } from '../../../src/capabilities/types.js';
 
-// pauseController needs bootstrapRdp() + makePauseController(rdp, scripts) wired in
-// Session.ensureRdp. Re-enable when RDP-side caps land.
+// pauseController.attach(threadActor) requires the threadActor returned by
+// `<currentTarget>.attach`. Wiring that needs bootstrapRdp to complete reliably,
+// which is currently flaky on Firefox 150 headless (no target-available-form
+// emit). Re-enable when M7.04 adds a fall-back threadActor discovery path.
 describe.skip('capability: pauseController (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;
@@ -24,7 +27,25 @@ describe.skip('capability: pauseController (live)', () => {
       context: ctx, url: `${fixture.url}/fixture-xhr-pause.html`, wait: 'complete',
     });
 
-    const bp = await pc.setBreakpointByText('return btoa', '/sign.js');
+    // Hydrate the ScriptCache with sign.js — setBreakpointByText searches the cache,
+    // not the live page. In production this is what get_script_source does.
+    const sh = ff.session.caps.scriptHost as ScriptHost;
+    const realm = (await sh.listRealms(ctx)).find(r => r.type === 'window')!;
+    const fetched = await sh.callFunction(realm.realmId,
+      '(u) => fetch(u, { credentials: "same-origin" }).then(r => r.text())',
+      [{ type: 'string', value: `${fixture.url}/sign.js` }],
+      { awaitPromise: true });
+    const source = (fetched.result as { value?: string })?.value ?? '';
+    const hash = createHash('sha1').update(source).digest('hex').slice(0, 12);
+    ff.session.scripts.put({
+      id: `script-${hash}`,
+      url: `${fixture.url}/sign.js`,
+      source,
+      hash,
+    });
+
+    // setBreakpointByText filters cached.url === sourceUrl exactly; pass the full URL.
+    const bp = await pc.setBreakpointByText('return btoa', `${fixture.url}/sign.js`);
     expect(bp.bpId).toBeTruthy();
 
     // Click button to invoke computeSig.

@@ -1,0 +1,43 @@
+{
+  "site": "https://abrahamjuliot.github.io/creepjs/",
+  "timestamp": "2026-06-12",
+  "stack": "JSReverser-Strong-MCP (CDP) attached to user-launched Chrome 149 with --remote-debugging-port=9222",
+  "purpose": "cross-stack baseline so we can attribute Camoufox+M7.11 deltas correctly (engine vs tooling)",
+  "browser_fingerprint": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "navigator_webdriver": true
+  },
+  "main_world_probes": {
+    "fetch_toString": "function fetch() { [native code] }",
+    "has_sh_mask": false,
+    "sh_globals": []
+  },
+  "iframe_realm_probes": {
+    "fresh_blank_iframe_fetch_toString": "function fetch() { [native code] }",
+    "comment": "naturally native because no hook installed on this stack"
+  },
+  "creepjs_scoring": {
+    "headless_pct": 33,
+    "like_headless_pct": 0,
+    "stealth_pct": 0,
+    "resistance": {
+      "privacy": "unknown",
+      "security": "unknown",
+      "mode": "unknown",
+      "extension": "unknown"
+    },
+    "raw_snippet": "headless: a0f87f0f 33% headless: a427e0b8 0% stealth: 0c019315 ... Resistanceeb6b354a privacy: unknown security: unknown mode: unknown extension: unknown ..."
+  },
+  "comparison_with_camoufox_m7.11": {
+    "headless_pct": "33% on both — pure engine signal (Headless detection is heuristic-based and present even on CDP-driven full Chrome)",
+    "navigator_webdriver": "Chrome=true (CDP exposes it), Camoufox=false (C++-level patch)",
+    "stealth_pct": "Chrome=0, Camoufox+hook=20 — confirms the 20% jump is caused by our wrapper leaking through iframe-realm Function.prototype.toString",
+    "resistance_extension": "Chrome=unknown, Camoufox+hook=d4ec0779 — same root cause as above",
+    "verdict": [
+      "Stealth%=0 + Resistance.extension=unknown are achievable on a clean stack, so M7.11's regression is purely from our cross-realm installer not patching iframe realms.",
+      "Headless%=33 is unavoidable at the Chromium/Firefox engine layer on macOS without GPU acceleration baseline — not a M7.11 regression.",
+      "Camoufox is the only path that gives navigator.webdriver=false; the cost is the wrapper-leak surface we just identified."
+    ]
+  },
+  "next_action": "fix emitCrossRealmInstaller in src/capabilities/stealthHook.ts so iframe-realm Function.prototype.toString is actually patched (suspected issue: installInFrame uses outer-realm toString reference or runs before frame load fires)"
+}

@@ -187,17 +187,17 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
     async removeBreakpoint(bpId) {
       const entry = breakpoints.get(bpId);
       if (!entry) return;
+      // Firefox 150: thread.removeBreakpoint accepts the same location object as
+      // setBreakpoint. The legacy per-bp-actor 'delete' packet is gone. We send
+      // the snapped (actual) location so the server can match the breakpoint it
+      // actually stored — using the requested column would miss after the snap.
+      const loc: { sourceUrl: string; line: number; column?: number } = {
+        sourceUrl: entry.sourceUrl,
+        line: entry.actualLine ?? entry.line,
+      };
+      if (entry.actualColumn !== undefined) loc.column = entry.actualColumn;
       try {
-        // Firefox 150: thread.removeBreakpoint accepts the same location object as
-        // setBreakpoint. The legacy per-bp-actor 'delete' packet is gone.
-        await rdp.call(entry.bpActor, {
-          type: 'removeBreakpoint',
-          location: {
-            sourceUrl: entry.sourceUrl,
-            line: entry.line,
-            ...(entry.column !== undefined ? { column: entry.column } : {}),
-          },
-        });
+        await rdp.call(entry.bpActor, { type: 'removeBreakpoint', location: loc });
       } catch { /* best-effort */ }
       breakpoints.delete(bpId);
     },

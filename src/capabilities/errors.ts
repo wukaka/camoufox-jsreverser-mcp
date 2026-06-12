@@ -64,3 +64,9 @@ export class AstParseFailedError extends CapabilityError {
     super('AST parse failed');
   }
 }
+
+export class StealthWorkersUnavailableError extends CapabilityError {
+  constructor() {
+    super('stealth: workerTopology not available — workers cannot be injected');
+  }
+}

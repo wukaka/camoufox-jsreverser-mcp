@@ -16,6 +16,7 @@ export enum ErrorReason {
   WorkerNotAttached = 'worker_not_attached',
   WorkerInjectionDelayed = 'worker_injection_delayed',
   PrefsActorUnavailable = 'prefs_actor_unavailable',
+  StealthWorkersUnavailable = 'stealth_workers_unavailable',
 }
 
 export interface ToolWarning { code: string; message: string }

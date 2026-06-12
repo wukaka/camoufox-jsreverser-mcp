@@ -34,18 +34,30 @@ driver → capability → session → tool
 
 Requires Node.js 20+.
 
-```bash
-npm install
-npm run build
-```
+**Supported browser stack: Camoufox + geckodriver only.** Raw `firefox --remote-debugging-port` exposes CDP, not WebDriver BiDi, and is not supported. Camoufox provides C++-level anti-detection (navigator.webdriver=false, fingerprint patches) that the in-tree `firefox-default` preload payload layers on top of.
 
-Live integration / e2e suites additionally require:
+### macOS
 
-- Firefox (stable or ESR)
-- [geckodriver](https://github.com/mozilla/geckodriver) on `PATH`
+1. **Camoufox.** Download the latest macOS `.dmg` from <https://github.com/daijro/camoufox/releases> and drag the bundle into `/Applications`. First launch: right-click the app → **Open** to bypass Gatekeeper.
+2. **geckodriver.** `brew install geckodriver`.
+   - Apple Silicon installs to `/opt/homebrew/bin/geckodriver`.
+   - Intel installs to `/usr/local/bin/geckodriver` (matches the in-code default).
+3. **Project.**
 
-Bare `firefox --remote-debugging-port` exposes CDP, not WebDriver BiDi; geckodriver is
-the supported BiDi front-end and is required for L2/L3 to exercise the protocol.
+   ```bash
+   npm install
+   npm run build
+   ```
+
+Live integration / e2e suites require Camoufox and geckodriver to be present — they will throw, not self-skip, if the handshake fails. The unit suite (`npm test`) runs fine without either binary.
+
+### Linux / Windows
+
+Not regularly verified. Install Camoufox from the [Camoufox releases](https://github.com/daijro/camoufox/releases) and geckodriver from the [geckodriver releases](https://github.com/mozilla/geckodriver/releases), then point `CAMOUFOX_PATH` / `GECKODRIVER_PATH` (or `--camoufox-path` / `--geckodriver-path`) at the installed binaries.
+
+### What `--stealth` controls
+
+`--stealth=auto` (default) installs the `firefox-default` preload payload from `src/stealth-scripts/` during session init. `--stealth=off` skips the preload only — Camoufox's C++ stealth layer is always on regardless of this flag.
 
 ## Configure
 
@@ -61,12 +73,10 @@ cp .env.example .env
 | `LLM_API_KEY` | Bearer key for the selected provider. |
 | `LLM_BASE_URL` | Required for `openai-compatible`; optional override for the others. |
 | `LLM_DEFAULT_MODEL` | Optional default model id. |
-| `FIREFOX_PATH` | Override Firefox binary location (auto-detected on macOS / Linux). |
-| `GECKODRIVER_PATH` | Override geckodriver binary location. |
+| `CAMOUFOX_PATH` | Camoufox binary location. macOS default: `/Applications/Camoufox.app/Contents/MacOS/camoufox`. |
+| `GECKODRIVER_PATH` | geckodriver binary location. Default: `/usr/local/bin/geckodriver`. Apple Silicon brew installs to `/opt/homebrew/bin/geckodriver` — override here. |
 
-`understand_code`, `summarize_code` and `deobfuscate_code` (LLM post-processing) return
-`LlmNotConfigured` cleanly when no provider is configured — never throw — so the rest
-of the tool surface stays usable without an LLM key.
+`understand_code`, `summarize_code` and `deobfuscate_code` (LLM post-processing) return `LlmNotConfigured` cleanly when no provider is configured — never throw — so the rest of the tool surface stays usable without an LLM key.
 
 ## Run
 
@@ -82,11 +92,13 @@ CLI flags:
 
 | Flag | Meaning |
 |---|---|
-| `--attach` | Skip launching Firefox; use `--bidi-url` + `--rdp-port`. |
+| `--attach` | Skip launching Camoufox; use `--bidi-url` + `--rdp-port`. |
 | `--bidi-url <ws>` | WebDriver BiDi WebSocket URL (attach mode). |
-| `--rdp-port <port>` | Firefox RDP TCP port (attach mode). |
-| `--firefox-path <path>` | Override Firefox binary (defaults to `FIREFOX_PATH` or auto-detected). |
-| `--stealth <auto\|off>` | Apply the `firefox-default` stealth preset on init (default `auto`). |
+| `--rdp-port <port>` | Firefox RDP TCP port. Required in attach mode; auto-allocated in launch mode. |
+| `--camoufox-path <path>` | Override Camoufox binary (defaults to `CAMOUFOX_PATH` or the macOS path above). |
+| `--geckodriver-path <path>` | Override geckodriver binary (defaults to `GECKODRIVER_PATH` or `/usr/local/bin/geckodriver`). |
+| `--user-agent <ua>` | Override the leaky `Camoufox/<ver>` UA brand on the launched profile. |
+| `--stealth <auto\|off>` | Apply the `firefox-default` preload on init (default `auto`). Does NOT control the always-on Camoufox C++ stealth. |
 
 ## Test layers
 

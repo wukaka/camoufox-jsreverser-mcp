@@ -57,30 +57,34 @@ async function main(): Promise<void> {
     },
   });
 
-  await session.init({
-    mode: argv.attach ? 'attach' : 'launch',
+  const initOpts = {
+    mode: (argv.attach ? 'attach' : 'launch') as 'attach' | 'launch',
     bidiUrl: argv.bidiUrl,
     rdpPort: argv.rdpPort,
     stealth: argv.stealth,
     ...(argv.userAgent ? { userAgentOverride: argv.userAgent } : {}),
-  });
+  };
 
-  await startServer(session, [
-    ...pageStateTools,
-    ...scriptsTools,
-    ...hooksTools,
-    ...networkTools,
-    ...storageTools,
-    ...domTools,
-    ...consoleTools,
-    ...websocketTools,
-    ...workersTools,
-    ...debuggerTools,
-    ...prefsTools,
-    ...stealthTools,
-    ...aiAstTools,
-    ...rebuildTools,
-  ]);
+  await startServer(
+    session,
+    [
+      ...pageStateTools,
+      ...scriptsTools,
+      ...hooksTools,
+      ...networkTools,
+      ...storageTools,
+      ...domTools,
+      ...consoleTools,
+      ...websocketTools,
+      ...workersTools,
+      ...debuggerTools,
+      ...prefsTools,
+      ...stealthTools,
+      ...aiAstTools,
+      ...rebuildTools,
+    ],
+    { ensureInit: () => session.init(initOpts) },
+  );
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

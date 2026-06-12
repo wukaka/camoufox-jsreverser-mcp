@@ -10,7 +10,7 @@ describe('set_breakpoint_on_text', () => {
     const r = await executeTool(set_breakpoint_on_text, { text: 'secretToken' }, session);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.breakpoint.bpId).toBe('bp-t1');
-    expect(pc.setBreakpointByText).toHaveBeenCalledWith('secretToken', undefined);
+    expect(pc.setBreakpointByText).toHaveBeenCalledWith('secretToken', undefined, { columnTolerance: undefined });
   });
 
   it('passes optional sourceUrl', async () => {
@@ -18,7 +18,7 @@ describe('set_breakpoint_on_text', () => {
     const pc = { setBreakpointByText: vi.fn().mockResolvedValue(bp) };
     const session = { isReady: () => true, caps: { pauseController: pc } } as any;
     await executeTool(set_breakpoint_on_text, { text: 'foo', sourceUrl: 'https://b' }, session);
-    expect(pc.setBreakpointByText).toHaveBeenCalledWith('foo', 'https://b');
+    expect(pc.setBreakpointByText).toHaveBeenCalledWith('foo', 'https://b', { columnTolerance: undefined });
   });
 
   it('rejects extra fields (strict schema)', async () => {

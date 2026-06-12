@@ -170,14 +170,14 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
       return entry;
     },
 
-    async setBreakpointByText(text, sourceUrl) {
+    async setBreakpointByText(text, sourceUrl, opts) {
       const candidates = scripts.list().filter(s => !sourceUrl || s.url === sourceUrl);
       for (const cached of candidates) {
         const lines = cached.source.split('\n');
         for (let i = 0; i < lines.length; i++) {
           const idx = (lines[i] ?? '').indexOf(text);
           if (idx >= 0) {
-            return await this.setBreakpointByLocation(cached.url, i + 1, idx + 1);
+            return await this.setBreakpointByLocation(cached.url, i + 1, idx + 1, opts);
           }
         }
       }

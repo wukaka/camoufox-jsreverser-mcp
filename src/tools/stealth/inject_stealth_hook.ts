@@ -16,7 +16,7 @@ const schema = z.object({
 }).strict();
 type Args = z.infer<typeof schema>;
 
-interface Output { preloadId: string; wraps: number; neutraliseTiming: boolean }
+export interface Output { preloadId: string; wraps: number; neutraliseTiming: boolean }
 
 export const inject_stealth_hook = defineTool<Args, Output>({
   name: 'inject_stealth_hook',

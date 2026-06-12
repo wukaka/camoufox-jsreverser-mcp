@@ -10,7 +10,7 @@ const schema = z.object({
 }).strict();
 type Args = z.infer<typeof schema>;
 
-interface Output {
+export interface Output {
   injected: string[];
   failed: { realmId: string; reason: string }[];
   injectedAt: 'post-start';

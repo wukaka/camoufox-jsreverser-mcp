@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>fixture-worker-stealth</title>
+<body>
+<h1>fixture-worker-stealth</h1>
+<script>
+  const w = new Worker('/worker-stealth.js');
+  window.__workerReply = null;
+  w.addEventListener('message', (ev) => { window.__workerReply = ev.data; });
+  window.__askWorker = function () {
+    window.__workerReply = null;
+    w.postMessage({ cmd: 'measure' });
+  };
+</script>
+</body>

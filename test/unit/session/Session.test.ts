@@ -159,3 +159,20 @@ describe('Session', () => {
     expect(s.stealthApplyError).toBeInstanceOf(Error);
   });
 });
+
+describe('Session worker-stealth unsubscribe tracking', () => {
+  it('registerWorkerStealthUnsubscribe collects fns and shutdown runs them', async () => {
+    const session = new Session({
+      launcher: { shutdown: vi.fn().mockResolvedValue(undefined) } as any,
+      makeBidi: vi.fn() as any,
+      makeRdp: vi.fn() as any,
+    });
+    const a = vi.fn();
+    const b = vi.fn();
+    session.registerWorkerStealthUnsubscribe(a);
+    session.registerWorkerStealthUnsubscribe(b);
+    await session.shutdown();
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(1);
+  });
+});

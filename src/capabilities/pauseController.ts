@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { randomBytes } from 'node:crypto';
 import { RdpDriver } from '../drivers/rdp/RdpDriver.js';
-import { ScriptCache } from '../session/caches.js';
+import { ScriptCache, BreakpointPosition } from '../session/caches.js';
 import {
   BreakpointUnresolvedError,
   NotPausedError,
@@ -226,3 +226,20 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
     },
   };
 }
+
+function snapColumn(positions: BreakpointPosition[], desiredCol: number): number | undefined {
+  if (positions.length === 0) return undefined;
+  if (positions.length === 1) return positions[0]!.column;
+  let best = positions[0]!;
+  let bestDist = Math.abs(best.column - desiredCol);
+  for (const p of positions.slice(1)) {
+    const dist = Math.abs(p.column - desiredCol);
+    if (dist < bestDist || (dist === bestDist && p.column >= desiredCol && best.column < desiredCol)) {
+      best = p;
+      bestDist = dist;
+    }
+  }
+  return best.column;
+}
+
+export const __testing = { snapColumn };

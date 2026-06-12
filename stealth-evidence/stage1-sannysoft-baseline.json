@@ -1,0 +1,38 @@
+{
+  "site": "https://bot.sannysoft.com/",
+  "timestamp": "2026-06-12",
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Camoufox/150.0.2-beta.25",
+  "webdriver": false,
+  "plugins": 5,
+  "languages": ["en-US", "en"],
+  "screenshot": "stage1-sannysoft-baseline.png",
+  "summary": {
+    "passed": [
+      "WebDriver Advanced",
+      "Chrome (New)",
+      "Permissions (New)",
+      "Plugins Length (Old)",
+      "Plugins is of type PluginArray",
+      "Languages (Old)",
+      "WebGL Vendor / Renderer",
+      "Broken Image Dimensions",
+      "PHANTOM_UA / PROPERTIES / LANGUAGE / WEBSOCKET / OVERFLOW / WINDOW_HEIGHT",
+      "MQ_SCREEN",
+      "HEADCHR_UA / CHROME_OBJ / PERMISSIONS / PLUGINS / IFRAME",
+      "CHR_DEBUG_TOOLS / BATTERY / MEMORY",
+      "SELENIUM_DRIVER",
+      "TRANSPARENT_PIXEL",
+      "SEQUENTUM",
+      "VIDEO_CODECS"
+    ],
+    "failed": [
+      { "k": "WebDriver (New)", "v": "present (failed)", "note": "页面 DOM 探测到 webdriver-like 痕迹" },
+      { "k": "PHANTOM_ETSL", "v": "FAIL", "note": "Function.prototype.toString 探测漏点" }
+    ],
+    "notes": [
+      "UA 字符串包含 'Camoufox/150.0.2-beta.25' — 字符串匹配下游会识破，需 set_user_agent 改写或开 fingerprint preset",
+      "navigator.vendor 为空字符串 — 真 Firefox 行为，passes 探测",
+      "navigator.platform = MacIntel"
+    ]
+  }
+}

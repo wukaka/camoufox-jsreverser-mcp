@@ -1,0 +1,48 @@
+{
+  "site": "https://abrahamjuliot.github.io/creepjs/",
+  "timestamp": "2026-06-12",
+  "screenshot": "stage3-creepjs-baseline.png",
+  "ids": {
+    "fpId": "971fb3a43285071e3a4074b55208b12e1a750118f9e5f4a07fed63cb2e0142a5",
+    "fuzzy": "b7d9807f11ecf5acfe39e4c34c8d4d0c5fe376ac156ddd0f2df7000000000000",
+    "liesHash": "c33a2c80"
+  },
+  "ratings": {
+    "chromium": false,
+    "likeHeadlessPct": 0,
+    "headlessPct": 33,
+    "stealthPct": 0
+  },
+  "resistance": {
+    "privacy": "unknown",
+    "security": "unknown",
+    "mode": "unknown",
+    "extension": "unknown"
+  },
+  "worker": {
+    "scope": "ServiceWorkerGlobalScope",
+    "lang_timezone": "en-US (1 US dollar), Asia/Shanghai (-480)",
+    "confidence": "high",
+    "gpu": "Intel Inc. / Intel(R) HD Graphics 400, or similar",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Camoufox/150.0.2-beta.25",
+    "device": "Mac (MacIntel), macOS Catalina, cores: 6",
+    "userAgentData": "unsupported"
+  },
+  "navigator": {
+    "vendor": "blocked",
+    "lang": "en-US, en (en-US)",
+    "plugins": 5,
+    "permissions": 1,
+    "mimeTypes": 2,
+    "propertiesCount": 45
+  },
+  "summary": {
+    "stealthScore": "0% — CreepJS 没识别为已加 stealth",
+    "headlessScore": "33% — 中等漏点（细节未展开，CreepJS 用 hash 压缩）",
+    "concerns": [
+      "Worker UA 暴露 Camoufox 字串",
+      "main UA 同样暴露 Camoufox 字串",
+      "lies hash c33a2c80 来自 Navigator 段（详细未展开）"
+    ]
+  }
+}

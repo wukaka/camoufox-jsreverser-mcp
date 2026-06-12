@@ -66,18 +66,78 @@ function emitResolveTarget(targetPath: string): string {
 function emitToStringMasking(): string {
   return `
     var __maskFn = (function () {
-      var fp = Function.prototype;
-      var realFnToString = fp.toString;
-      var realCall = fp.call;
+      // Shared WeakMap referenced by every realm we patch. Wraps registered
+      // by the main IIFE are visible to iframe realms because the override
+      // installed in each realm closes over the same map reference.
       var map = new WeakMap();
-      var override = function () {
-        var masked = map.get(this);
-        if (masked !== undefined) return masked;
-        return realCall.call(realFnToString, this);
-      };
-      // Mask the override itself so toString.toString() also looks native.
-      map.set(override, 'function toString() { [native code] }');
-      fp.toString = override;
+
+      function installInRealm(targetWin) {
+        try {
+          var fp = targetWin.Function.prototype;
+          var realFnToString = fp.toString;
+          var realCall = fp.call;
+          var override = function () {
+            var masked = map.get(this);
+            if (masked !== undefined) return masked;
+            return realCall.call(realFnToString, this);
+          };
+          map.set(override, 'function toString() { [native code] }');
+          fp.toString = override;
+        } catch (e) {
+          // Cross-origin frames throw on Function access; documented limitation.
+        }
+      }
+
+      // 1) Install in the top realm.
+      installInRealm(globalThis);
+
+      // 2) Initial sweep: existing iframes (same-origin / about:blank only).
+      try {
+        var doc = (typeof document !== 'undefined') ? document : null;
+        if (doc && doc.querySelectorAll) {
+          var frames = doc.querySelectorAll('iframe');
+          for (var i = 0; i < frames.length; i++) {
+            try {
+              var cw = frames[i].contentWindow;
+              if (cw) installInRealm(cw);
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
+      // 3) Future iframes: MutationObserver on the document. For each added
+      //    HTMLIFrameElement, try install on contentWindow immediately + on
+      //    the load event.
+      try {
+        var MO = (typeof MutationObserver !== 'undefined') ? MutationObserver : null;
+        if (MO && doc) {
+          var obs = new MO(function (records) {
+            for (var r = 0; r < records.length; r++) {
+              var added = records[r].addedNodes;
+              for (var n = 0; n < added.length; n++) {
+                var node = added[n];
+                if (!node || node.nodeType !== 1) continue;
+                if (node.tagName === 'IFRAME') {
+                  try { if (node.contentWindow) installInRealm(node.contentWindow); } catch (e) {}
+                  try { node.addEventListener('load', function (ev) {
+                    try { installInRealm(ev.target.contentWindow); } catch (e) {}
+                  }); } catch (e) {}
+                } else if (node.querySelectorAll) {
+                  // The added subtree may contain iframes.
+                  try {
+                    var nested = node.querySelectorAll('iframe');
+                    for (var k = 0; k < nested.length; k++) {
+                      try { if (nested[k].contentWindow) installInRealm(nested[k].contentWindow); } catch (e) {}
+                    }
+                  } catch (e) {}
+                }
+              }
+            }
+          });
+          try { obs.observe(doc, { childList: true, subtree: true }); } catch (e) {}
+        }
+      } catch (e) {}
+
       return function maskAs(target, asNativeName) {
         map.set(target, 'function ' + asNativeName + '() { [native code] }');
       };

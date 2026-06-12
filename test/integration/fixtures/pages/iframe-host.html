@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>M7.11 iframe host fixture</title></head>
+<body>
+  <!-- 1. Static same-origin iframe (about:blank). Exists at preload time. -->
+  <iframe id="static" src="about:blank"></iframe>
+
+  <!-- 2. DOMContentLoaded-time injected same-origin iframe. -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var f = document.createElement('iframe');
+      f.id = 'dom-injected';
+      f.src = 'about:blank';
+      document.body.appendChild(f);
+    });
+  </script>
+
+  <!-- 3. setTimeout-injected same-origin iframe. Exists only after 200ms. -->
+  <script>
+    setTimeout(function () {
+      var f = document.createElement('iframe');
+      f.id = 'delayed';
+      f.src = 'about:blank';
+      document.body.appendChild(f);
+    }, 200);
+  </script>
+</body>
+</html>

@@ -7,7 +7,7 @@ import {
   NotPausedError,
 } from './errors.js';
 import {
-  BreakpointEntry, PauseController, PauseInfo, CallframeResult,
+  BreakpointEntry, BreakpointOptions, PauseController, PauseInfo, CallframeResult,
 } from './types.js';
 
 interface PausedFrame {
@@ -90,12 +90,8 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
     },
     isAttached() { return threadActor !== null; },
 
-    async setBreakpointByLocation(sourceUrl, line, column) {
+    async setBreakpointByLocation(sourceUrl, line, column, opts) {
       if (!threadActor) throw new Error('pauseController: not attached');
-      // Firefox 150 routes setBreakpoint through the thread actor (the legacy
-      // <source>.setBreakpoint packet was removed). We still resolve the source
-      // ahead of time so we can fail fast with noScript when the URL is unknown
-      // and so removeBreakpoint can route through the same location object.
       const sourcesReply = await rdp.call<{ sources: Array<{ actor: string; url: string }> }>(
         threadActor, { type: 'sources' },
       );
@@ -103,7 +99,45 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
       if (!source) {
         throw new BreakpointUnresolvedError('noScript', { sourceUrl, line });
       }
-      const location = { sourceUrl, line, ...(column !== undefined ? { column } : {}) };
+
+      // Firefox 150 resolves location via Debugger.Source.getPossibleBreakpoints.
+      // We snap the requested column to the nearest legal position; if the source
+      // actor doesn't support the packet or returns no positions, we fall back to
+      // omitting the column and let the server LSP-resolve to the line's first
+      // legal stop. See docs/superpowers/specs/2026-06-12-m7.07-column-index-fix-design.md
+      let positions: BreakpointPosition[] = [];
+      const cachedScript = scripts.list().find(s => s.url === sourceUrl);
+      const fetchPositions = async (): Promise<BreakpointPosition[]> => {
+        try {
+          const reply = await rdp.call<{ positions?: BreakpointPosition[] }>(
+            source.actor,
+            {
+              type: 'getPossibleBreakpoints',
+              start: { line, column: 0 },
+              end: { line: line + 1, column: 0 },
+            },
+          );
+          return reply.positions ?? [];
+        } catch {
+          return [];
+        }
+      };
+      if (cachedScript) {
+        positions = await scripts.getOrComputePositions(cachedScript.id, line, fetchPositions);
+      } else {
+        positions = await fetchPositions();
+      }
+
+      let actualColumn: number | undefined;
+      if (column !== undefined) {
+        actualColumn = snapColumn(positions, column);
+      } else if (positions.length > 0) {
+        actualColumn = positions[0]!.column;
+      }
+
+      const location: { sourceUrl: string; line: number; column?: number } = { sourceUrl, line };
+      if (actualColumn !== undefined) location.column = actualColumn;
+
       const reply = await rdp.call<{ error?: string }>(
         threadActor,
         { type: 'setBreakpoint', location, options: {} },
@@ -112,10 +146,6 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
         throw new BreakpointUnresolvedError(reply.error as 'noScript' | 'noCodeAtLineColumn', { sourceUrl, line });
       }
       const bpId = `bp-${randomBytes(4).toString('hex')}`;
-      // Firefox 150 does not return a bp actor; the thread owns the breakpoint
-      // and identifies it by location alone. Keep the bpActor field non-empty so
-      // the public BreakpointEntry shape stays stable; threadActor doubles as
-      // the owner that removeBreakpoint targets.
       const entry: BreakpointEntry = {
         bpId,
         bpActor: threadActor,
@@ -123,6 +153,10 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
         sourceUrl,
         line,
         ...(column !== undefined ? { column } : {}),
+        ...(column !== undefined ? { requestedColumn: column } : {}),
+        actualLine: line,
+        ...(actualColumn !== undefined ? { actualColumn } : {}),
+        ...((opts as BreakpointOptions | undefined)?.columnTolerance ? { columnTolerance: opts!.columnTolerance } : {}),
       };
       breakpoints.set(bpId, entry);
       return entry;

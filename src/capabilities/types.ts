@@ -177,6 +177,15 @@ export interface WsObserver {
   installFrameHook(): string;
 }
 
+export interface BreakpointOptions {
+  /** Width (in columns) of the acceptable hit window around the requested column.
+   *  - undefined or 0 → accept whatever actualColumn we snapped to (CDP default).
+   *  - > 0            → in the paused listener, auto-resume when frame.where.column
+   *                     falls outside [requestedColumn - tolerance, requestedColumn + tolerance],
+   *                     up to MAX_SKIPS internal retries before forcing accept. */
+  columnTolerance?: number;
+}
+
 export interface BreakpointEntry {
   bpId: string;
   bpActor: string;
@@ -184,8 +193,10 @@ export interface BreakpointEntry {
   sourceUrl: string;
   line: number;
   column?: number;
+  requestedColumn?: number;
   actualLine?: number;
   actualColumn?: number;
+  columnTolerance?: number;
 }
 
 export interface PauseInfo {
@@ -208,8 +219,12 @@ export interface PauseController {
   attach(threadActor: string): Promise<void>;
   isAttached(): boolean;
 
-  setBreakpointByLocation(sourceUrl: string, line: number, column?: number): Promise<BreakpointEntry>;
-  setBreakpointByText(text: string, sourceUrl?: string): Promise<BreakpointEntry>;
+  setBreakpointByLocation(
+    sourceUrl: string, line: number, column?: number, opts?: BreakpointOptions,
+  ): Promise<BreakpointEntry>;
+  setBreakpointByText(
+    text: string, sourceUrl?: string, opts?: BreakpointOptions,
+  ): Promise<BreakpointEntry>;
   removeBreakpoint(bpId: string): Promise<void>;
   listBreakpoints(): BreakpointEntry[];
 

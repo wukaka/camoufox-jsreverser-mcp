@@ -44,6 +44,8 @@ export class Session {
   activeMonitors: Map<string, { id: string; events: string[]; startedAt: number }> = new Map();
   activeWorkerRealmId: string | null = null;
 
+  private workerStealthUnsubscribes: Array<() => void> = [];
+
   bidi!: BidiDriver;
   stealthApplyError: Error | null = null;
   private rdpFactory: ((port: number) => Promise<RdpDriver>) | null = null;
@@ -198,7 +200,15 @@ export class Session {
 
   isReady(): boolean { return this.ready; }
 
+  registerWorkerStealthUnsubscribe(fn: () => void): void {
+    this.workerStealthUnsubscribes.push(fn);
+  }
+
   async shutdown(): Promise<void> {
+    for (const fn of this.workerStealthUnsubscribes) {
+      try { fn(); } catch { /* best-effort */ }
+    }
+    this.workerStealthUnsubscribes = [];
     try { this.bidi?.close(); } catch {}
     try { this.rdp?.close(); } catch {}
     await this.deps.launcher.shutdown();

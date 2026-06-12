@@ -8,6 +8,7 @@ function unwrapEffects(s: ZodTypeAny): ZodTypeAny {
     if (def.typeName === 'ZodEffects' && def.schema) { cur = def.schema; continue; }
     if (def.typeName === 'ZodOptional' && def.innerType) { cur = def.innerType; continue; }
     if (def.typeName === 'ZodNullable' && def.innerType) { cur = def.innerType; continue; }
+    if (def.typeName === 'ZodDefault' && def.innerType) { cur = def.innerType; continue; }
     return cur;
   }
 }
@@ -36,6 +37,7 @@ function singleZodToJson(s: ZodTypeAny): unknown {
     case 'ZodArray': return { type: 'array', items: singleZodToJson(def.type!) };
     case 'ZodOptional': return singleZodToJson(def.innerType!);
     case 'ZodNullable': return singleZodToJson(def.innerType!);
+    case 'ZodDefault': return singleZodToJson(def.innerType!);
     case 'ZodEffects': return singleZodToJson(def.schema!);
     case 'ZodEnum': return { type: 'string', enum: def.values };
     case 'ZodLiteral': return { const: def.value };

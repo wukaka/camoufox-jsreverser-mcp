@@ -316,11 +316,39 @@ export interface InitiatorTracer {
 export interface StealthFeature { name: string; description: string }
 export interface StealthPreset { name: string; description: string; features: string[] }
 
+export interface WorkerStealthInjection {
+  /** Worker realmIds that successfully received the preset payload. */
+  injected: string[];
+  /** Workers we attempted but failed; reason is the underlying error message. */
+  failed: { realmId: string; reason: string }[];
+  /** When the injection ran relative to the worker's lifecycle. Always 'post-start'
+   *  in this milestone — BiDi does not propagate addPreloadScript to worker realms,
+   *  so the worker's prologue (including any early navigator.webdriver reads or
+   *  Function.prototype.toString inspections) has already executed. */
+  injectedAt: 'post-start';
+  /** True when watching for new workers via workerTopology.onWorkerAvailable.
+   *  In BiDi-only mode this stays true but the underlying subscription is a no-op. */
+  watching: boolean;
+  /** Stops the onWorkerAvailable subscription. No-op when watching is false or
+   *  the underlying subscription was already a no-op. Idempotent. */
+  unwatch: () => void;
+}
+
+export interface ApplyPresetToWorkersOpts {
+  /** Default true: subscribe to workerTopology.onWorkerAvailable and inject the
+   *  preset into every dedicated/shared worker that appears after the call. */
+  watch?: boolean;
+}
+
 export interface Stealth {
   listFeatures(): StealthFeature[];
   listPresets(): StealthPreset[];
   applyPreset(presetName: string): Promise<{ preset: string; preloadIds: string[] }>;
   injectCustomScript(source: string): Promise<{ preloadId: string }>;
+  applyPresetToWorkers(
+    presetName: string,
+    opts?: ApplyPresetToWorkersOpts,
+  ): Promise<WorkerStealthInjection>;
 }
 
 export interface AstParseResult {

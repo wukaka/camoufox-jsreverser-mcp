@@ -76,43 +76,44 @@ function emitToStringMasking(): string {
 }
 
 function renderSingleWrap(emitName: string, wrap: StealthHookWrapSpec): string {
-  const capture = JSON.stringify(wrap.capture ?? ['args', 'return']);
+  const cap = wrap.capture ?? ['args', 'return'];
+  const wantArgs = cap.indexOf('args') >= 0;
+  const wantRet = cap.indexOf('return') >= 0;
+  const wantThis = cap.indexOf('this') >= 0;
+  const wantStack = cap.indexOf('stack') >= 0;
   const channelName = wrap.channelName ?? 'stealth-hook';
+  const fallbackName = wrap.targetPath.split('.').pop() ?? 'fn';
+
+  // Wrapper body is rendered as one line with single-character locals.
+  // Channel name and target path live in the surrounding IIFE closure (k, p)
+  // so the wrapper's own toString — visible to detectors via cross-realm
+  // probes before our mask installs — carries no stealth-tool-specific
+  // identifier tokens (no __capture / __sample / __args / __ret / __emit /
+  // Reflect.apply / fetch_calls literal). Object keys on the sample payload
+  // (args/ret/target/threw/stack/channel/ts) stay verbatim because they're
+  // part of the M7.10 channel-payload contract consumed by get_hook_data.
+  const parts: string[] = ['var a=arguments,b={channel:k,ts:Date.now(),target:p};'];
+  if (wantArgs) parts.push('try{b.args=[].slice.call(a)}catch(e){}');
+  if (wantThis) parts.push('try{b.thisArg=this}catch(e){}');
+  if (wantStack) parts.push('try{b.stack=(new Error()).stack}catch(e){}');
+  parts.push('var d;try{d=o.apply(this,a)}catch(e){b.threw=String(e);try{e2(b)}catch(_){}throw e}');
+  if (wantRet) parts.push('b.ret=d;');
+  parts.push('try{e2(b)}catch(_){}return d');
+  const wrapperBody = parts.join('');
+
   return `(function () {
     try {
       ${emitResolveTarget(wrap.targetPath)}
       ${emitToStringMasking()}
-      var __emit = globalThis[${q(emitName)}];
-      var __capture = ${capture};
-      var __name = __original.name || ${q(wrap.targetPath.split('.').pop() ?? 'fn')};
-      // The wrapper is an arrow-less regular function so .name reports __name when
-      // Object.defineProperty is used to copy it across, and so it can be called
-      // as a constructor when the original was constructable.
-      var __wrapped = function () {
-        var __args = arguments;
-        var __sample = { channel: ${q(channelName)}, ts: Date.now(), target: ${q(wrap.targetPath)} };
-        if (__capture.indexOf('args')   >= 0) try { __sample.args = Array.prototype.slice.call(__args); } catch (e) {}
-        if (__capture.indexOf('this')   >= 0) try { __sample.thisArg = this; } catch (e) {}
-        if (__capture.indexOf('stack')  >= 0) try { __sample.stack = (new Error()).stack; } catch (e) {}
-        var __ret;
-        try {
-          __ret = Reflect.apply(__original, this, __args);
-        } catch (e) {
-          __sample.threw = String(e);
-          try { if (typeof __emit === 'function') __emit(__sample); } catch (e2) {}
-          throw e;
-        }
-        if (__capture.indexOf('return') >= 0) __sample.ret = __ret;
-        try { if (typeof __emit === 'function') __emit(__sample); } catch (e2) {}
-        return __ret;
-      };
-      // Copy name + length so toString.fingerprint heuristics that include
-      // those agree with the original.
+      var e2 = globalThis[${q(emitName)}];
+      var k = ${q(channelName)};
+      var p = ${q(wrap.targetPath)};
+      var o = __original;
+      var __name = __original.name || ${q(fallbackName)};
+      var __wrapped = function () { ${wrapperBody} };
       try { Object.defineProperty(__wrapped, 'name',   { value: __name,            configurable: true }); } catch (e) {}
       try { Object.defineProperty(__wrapped, 'length', { value: __original.length, configurable: true }); } catch (e) {}
       __maskFn(__wrapped, __name);
-      // Install with the same property-descriptor shape as the original where
-      // possible; fall back to a direct assignment if the slot is non-configurable.
       try {
         Object.defineProperty(__owner, __key, {
           value: __wrapped,

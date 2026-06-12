@@ -374,3 +374,31 @@ describe('pauseController removeBreakpoint location', () => {
     });
   });
 });
+
+describe('pauseController setBreakpointByText opts forwarding', () => {
+  it('forwards columnTolerance to setBreakpointByLocation via the resolved match', async () => {
+    const rdp = fakeRdp();
+    rdp.call
+      .mockResolvedValueOnce({ from: 'thread-1' })
+      .mockResolvedValueOnce({ from: 'thread-1' });
+    rdp.call.mockResolvedValueOnce({
+      from: 'thread-1',
+      sources: [{ actor: 'src-1', url: '/x.js' }],
+    });
+    rdp.call.mockResolvedValueOnce({
+      from: 'src-1',
+      positions: [{ line: 2, column: 8 }],
+    });
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });
+
+    const scripts = new ScriptCache();
+    scripts.put({ id: 's1', url: '/x.js', source: 'var a=1;\nvar c=btoa("x");', hash: 'h1' });
+    const pc = makePauseController(rdp as any, scripts);
+    await pc.attach('thread-1');
+    const bp = await pc.setBreakpointByText('btoa', '/x.js', { columnTolerance: 50 });
+
+    expect(bp.line).toBe(2);
+    expect(bp.requestedColumn).toBeGreaterThan(0);
+    expect(bp.columnTolerance).toBe(50);
+  });
+});

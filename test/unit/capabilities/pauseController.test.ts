@@ -345,3 +345,32 @@ describe('pauseController setBreakpoint with possibleBreakpoints snap', () => {
     });
   });
 });
+
+describe('pauseController removeBreakpoint location', () => {
+  it('sends removeBreakpoint with actualLine/actualColumn from the snap', async () => {
+    const rdp = fakeRdp();
+    rdp.call
+      .mockResolvedValueOnce({ from: 'thread-1' })
+      .mockResolvedValueOnce({ from: 'thread-1' });
+    rdp.call.mockResolvedValueOnce({
+      from: 'thread-1',
+      sources: [{ actor: 'src-1', url: 'https://a/x.js' }],
+    });
+    rdp.call.mockResolvedValueOnce({
+      from: 'src-1',
+      positions: [{ line: 4, column: 4 }, { line: 4, column: 12 }],
+    });
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });  // setBreakpoint
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });  // removeBreakpoint
+
+    const pc = makePauseController(rdp as any, new ScriptCache());
+    await pc.attach('thread-1');
+    const bp = await pc.setBreakpointByLocation('https://a/x.js', 4, 11);
+    await pc.removeBreakpoint(bp.bpId);
+
+    expect(rdp.call).toHaveBeenLastCalledWith('thread-1', {
+      type: 'removeBreakpoint',
+      location: { sourceUrl: 'https://a/x.js', line: 4, column: 12 },
+    });
+  });
+});

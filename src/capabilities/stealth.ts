@@ -1,5 +1,15 @@
 import { FIREFOX_DEFAULT_STEALTH } from '../stealth-scripts/firefox-default.js';
-import type { PreloadInjector, Stealth, StealthFeature, StealthPreset } from './types.js';
+import { StealthWorkersUnavailableError } from './errors.js';
+import type {
+  ApplyPresetToWorkersOpts,
+  PreloadInjector,
+  Stealth,
+  StealthFeature,
+  StealthPreset,
+  WorkerInfo,
+  WorkerStealthInjection,
+  WorkerTopology,
+} from './types.js';
 
 const FEATURES: StealthFeature[] = [
   { name: 'webdriver_false', description: 'Override navigator.webdriver to false' },
@@ -21,7 +31,15 @@ const PRESET_PAYLOADS: Record<string, string> = {
   'firefox-default': FIREFOX_DEFAULT_STEALTH,
 };
 
-export function makeStealth(preload: PreloadInjector): Stealth {
+/**
+ * `workers` is an accessor, not a fixed reference, because Session swaps the
+ * topology implementation between BiDi-only and RDP-aware at ensureRdp time.
+ * Reading it lazily lets a single `stealth` instance pick up the live handle.
+ */
+export function makeStealth(
+  preload: PreloadInjector,
+  workers?: () => WorkerTopology | undefined,
+): Stealth {
   return {
     listFeatures() { return FEATURES.slice(); },
     listPresets() { return PRESETS.slice(); },
@@ -34,6 +52,51 @@ export function makeStealth(preload: PreloadInjector): Stealth {
     async injectCustomScript(source) {
       const preloadId = await preload.add(source);
       return { preloadId };
+    },
+    async applyPresetToWorkers(presetName, opts) {
+      const payload = PRESET_PAYLOADS[presetName];
+      if (!payload) throw new Error(`stealth: unknown preset ${presetName}`);
+
+      const topology = workers?.();
+      if (!topology) throw new StealthWorkersUnavailableError();
+
+      const watch = opts?.watch ?? true;
+      const alreadyInjected = new Set<string>();
+      const injected: string[] = [];
+      const failed: { realmId: string; reason: string }[] = [];
+
+      const current = await topology.listWorkers();
+      const candidates = current.filter((w: WorkerInfo) => w.type === 'worker');
+
+      await Promise.allSettled(candidates.map(async (w: WorkerInfo) => {
+        try {
+          await preload.addToWorker(payload, w.realmId);
+          injected.push(w.realmId);
+          alreadyInjected.add(w.realmId);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          failed.push({ realmId: w.realmId, reason: msg });
+        }
+      }));
+
+      let unwatch = (): void => { /* no-op */ };
+      if (watch) {
+        unwatch = topology.onWorkerAvailable((w: WorkerInfo) => {
+          if (w.type !== 'worker') return;
+          if (alreadyInjected.has(w.realmId)) return;
+          alreadyInjected.add(w.realmId);
+          void preload.addToWorker(payload, w.realmId).catch(() => { /* best-effort */ });
+        });
+      }
+
+      const result: WorkerStealthInjection = {
+        injected,
+        failed,
+        injectedAt: 'post-start',
+        watching: watch,
+        unwatch,
+      };
+      return result;
     },
   };
 }

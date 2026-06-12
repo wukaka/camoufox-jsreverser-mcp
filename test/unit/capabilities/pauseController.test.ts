@@ -46,6 +46,7 @@ describe('pauseController', () => {
         { actor: 'src-2', url: 'https://a/y.js' },
       ],
     });
+    rdp.call.mockResolvedValueOnce({ from: 'src-1', positions: [] });  // getPossibleBreakpoints reply
     rdp.call.mockResolvedValueOnce({ from: 'thread-1' });  // setBreakpoint reply
 
     const pc = makePauseController(rdp as any, new ScriptCache());
@@ -83,6 +84,7 @@ describe('pauseController', () => {
       .mockResolvedValueOnce({ from: 'thread-1' })  // attach
       .mockResolvedValueOnce({ from: 'thread-1' })  // resume
       .mockResolvedValueOnce({ from: 'thread-1', sources: [{ actor: 'src-1', url: 'https://a' }] })
+      .mockResolvedValueOnce({ from: 'src-1', positions: [] })  // getPossibleBreakpoints reply
       .mockResolvedValueOnce({ from: 'thread-1' })  // setBreakpoint
       .mockResolvedValueOnce({ from: 'thread-1' }); // removeBreakpoint
 
@@ -255,5 +257,91 @@ describe('snapColumn', () => {
       [{ line: 4, column: 5 }, { line: 4, column: 15 }],
       10,
     )).toBe(15);
+  });
+});
+
+describe('pauseController setBreakpoint with possibleBreakpoints snap', () => {
+  it('snaps user column to the nearest legal position before setBreakpoint', async () => {
+    const rdp = fakeRdp();
+    rdp.call
+      .mockResolvedValueOnce({ from: 'thread-1' })  // attach
+      .mockResolvedValueOnce({ from: 'thread-1' }); // post-attach resume
+
+    rdp.call.mockResolvedValueOnce({
+      from: 'thread-1',
+      sources: [{ actor: 'src-1', url: 'https://a/x.js' }],
+    });
+    rdp.call.mockResolvedValueOnce({
+      from: 'src-1',
+      positions: [
+        { line: 4, column: 4 },
+        { line: 4, column: 12 },
+        { line: 4, column: 20 },
+      ],
+    });
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });  // setBreakpoint reply
+
+    const pc = makePauseController(rdp as any, new ScriptCache());
+    await pc.attach('thread-1');
+    const bp = await pc.setBreakpointByLocation('https://a/x.js', 4, 11);
+
+    expect(bp.requestedColumn).toBe(11);
+    expect(bp.actualColumn).toBe(12);
+    expect(bp.actualLine).toBe(4);
+    expect(rdp.call).toHaveBeenLastCalledWith('thread-1', {
+      type: 'setBreakpoint',
+      location: { sourceUrl: 'https://a/x.js', line: 4, column: 12 },
+      options: {},
+    });
+  });
+
+  it('omits column when getPossibleBreakpoints returns empty (fallback path)', async () => {
+    const rdp = fakeRdp();
+    rdp.call
+      .mockResolvedValueOnce({ from: 'thread-1' })
+      .mockResolvedValueOnce({ from: 'thread-1' });
+
+    rdp.call.mockResolvedValueOnce({
+      from: 'thread-1',
+      sources: [{ actor: 'src-1', url: 'https://a/x.js' }],
+    });
+    rdp.call.mockResolvedValueOnce({ from: 'src-1', positions: [] });
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });
+
+    const pc = makePauseController(rdp as any, new ScriptCache());
+    await pc.attach('thread-1');
+    const bp = await pc.setBreakpointByLocation('https://a/x.js', 7, 99);
+
+    expect(bp.actualColumn).toBeUndefined();
+    expect(rdp.call).toHaveBeenLastCalledWith('thread-1', {
+      type: 'setBreakpoint',
+      location: { sourceUrl: 'https://a/x.js', line: 7 },
+      options: {},
+    });
+  });
+
+  it('omits column when getPossibleBreakpoints itself throws', async () => {
+    const rdp = fakeRdp();
+    rdp.call
+      .mockResolvedValueOnce({ from: 'thread-1' })
+      .mockResolvedValueOnce({ from: 'thread-1' });
+
+    rdp.call.mockResolvedValueOnce({
+      from: 'thread-1',
+      sources: [{ actor: 'src-1', url: 'https://a/x.js' }],
+    });
+    rdp.call.mockRejectedValueOnce(new Error('unknownPacketType'));
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });
+
+    const pc = makePauseController(rdp as any, new ScriptCache());
+    await pc.attach('thread-1');
+    const bp = await pc.setBreakpointByLocation('https://a/x.js', 9, 3);
+
+    expect(bp.actualColumn).toBeUndefined();
+    expect(rdp.call).toHaveBeenLastCalledWith('thread-1', {
+      type: 'setBreakpoint',
+      location: { sourceUrl: 'https://a/x.js', line: 9 },
+      options: {},
+    });
   });
 });

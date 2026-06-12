@@ -2,12 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupLive, firstContext, type LiveSession } from './_setup.js';
 import type { PauseController, ObjectInspector, RdpGrip } from '../../../src/capabilities/types.js';
 
-// objectInspector exercises the paused-thread grip API, which currently relies on
-// the pauseController trigger-pause path. That trigger depends on Firefox 150's
-// new location-resolution semantics for setBreakpoint (the wire-level wiring is
-// proven in pauseController.test.ts; only the column index resolution remains).
-// Re-enable when the trigger-pause path is stable.
-describe.skip('capability: objectInspector (live)', () => {
+// objectInspector exercises the paused-thread grip API via pauseController. M7.07
+// restored Firefox 150 trigger-pause by snapping setBreakpoint to
+// Debugger.Source.getPossibleBreakpoints positions. See
+// docs/superpowers/specs/2026-06-12-m7.07-column-index-fix-design.md.
+describe('capability: objectInspector (live)', () => {
   let live: LiveSession | null = null;
   let shutdown: () => Promise<void>;
 

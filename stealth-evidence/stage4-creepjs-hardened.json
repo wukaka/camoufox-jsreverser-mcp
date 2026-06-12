@@ -1,0 +1,42 @@
+{
+  "site": "https://abrahamjuliot.github.io/creepjs/",
+  "timestamp": "2026-06-12",
+  "screenshot": "stage4-creepjs-hardened.png",
+  "hardening_applied": [
+    "inject_stealth_to_workers(preset=firefox-default, watch=true) — applied before reload",
+    "inject_stealth_hook(window.fetch, capture=[args,return,stack]) — preload injected"
+  ],
+  "ids": {
+    "fpId": "a2c480043438f20127943fecf705725470afba55a902822d9beaf4006c3654d6",
+    "fuzzy": "bbd9607f11ecf5ac783974c34c8d4d0ccfe376ac153ddd0f2df7000000000000",
+    "liesHash": "7ba99184"
+  },
+  "ratings": {
+    "chromium": false,
+    "likeHeadlessPct": 0,
+    "headlessPct": 33,
+    "stealthPct": 20
+  },
+  "resistance": {
+    "privacy": "unknown",
+    "security": "unknown",
+    "mode": "unknown",
+    "extension": "d4ec0779"
+  },
+  "worker_userAgent_still_exposes_camoufox": true,
+  "diff_vs_stage3_baseline": {
+    "fpId_changed": true,
+    "fuzzy_changed_microedit": true,
+    "liesHash_changed": "c33a2c80 -> 7ba99184",
+    "stealthPct_delta": "+20 (worse: stealth tooling detected)",
+    "resistance_extension_delta": "unknown -> d4ec0779 (worse: extension/injection detected)",
+    "headlessPct_unchanged": 33,
+    "worker_userAgent_unchanged": "Camoufox/150.0.2-beta.25 still exposed"
+  },
+  "interpretation": [
+    "加固后 CreepJS 的 stealth 评分从 0% 升到 20% — 我们的 hook 注入被反向探测到了",
+    "Resistance.extension 从 unknown 变成可指纹化值 — 同一组检测把注入识别为扩展行为",
+    "Worker UA 不变 — 印证 CLAUDE.md 的 post-start 局限：worker 已读到原值",
+    "结论：对抗 CreepJS 这一级，inject_stealth_hook 当前实现需要在 Function.toString 掩护和 stack 指纹上加固"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "site": "https://abrahamjuliot.github.io/creepjs/",
+  "timestamp": "2026-06-12",
+  "context": "after inject_stealth_hook(window.fetch) + inject_stealth_to_workers(firefox-default)",
+  "probe_via": "evaluate_script — direct DOM inspection of window.fetch and a freshly-created same-origin iframe",
+  "results": {
+    "main_world": {
+      "fetch_toString": "function fetch() { [native code] }",
+      "fetch_name": "fetch",
+      "fetch_length": 1,
+      "fetch_descriptor": { "writable": true, "configurable": true, "enumerable": true },
+      "tostring_toString": "function toString() { [native code] }",
+      "comment": "main-world Function.prototype.toString masking works as designed"
+    },
+    "iframe_realm_leak": {
+      "iframe_fetch_toString_excerpt": "function () {\n        var __args = arguments;\n        var __sample = { channel: \"fetch_calls\", ts: Date.now(), target: \"window.fetch\" };\n        if (__capture.indexOf('args')   >= 0) try { __sample.args = Array.prototype.slice.call(__args); } catch (e) {}\n        if (__capture.indexOf('this')   >= 0) try { __sample.thisArg = this; } catch (e) {}\n        if (__capture.indexOf('stack')  >= 0) try { __sample.stack = (new Error()).stack; } catch (e) {}\n        ...",
+      "main_match_iframe": false,
+      "iframe_fetch_eq_main": false,
+      "comment": "iframe realm sees full wrapper source: __capture, __sample, channel:\"fetch_calls\", Reflect.apply — confirmed root cause of CreepJS stealth% jump"
+    },
+    "global_pollution": {
+      "has_sh_mask": true,
+      "has_sh_timing": false,
+      "mcp_emit_globals_enumerable": [],
+      "comment": "__sh_mask__ leaks as 'in globalThis' === true even with enumerable:false; __mcp_emit_* keys would be similar but were not enumerated here"
+    }
+  },
+  "leads_to_milestone": "M7.11 (see docs/superpowers/specs/2026-06-12-m7.11-stealth-hook-v2-cross-realm-design.md)"
+}

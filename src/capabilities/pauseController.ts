@@ -10,6 +10,13 @@ import {
   BreakpointEntry, BreakpointOptions, PauseController, PauseInfo, CallframeResult,
 } from './types.js';
 
+const MAX_SKIPS = 8;
+
+function isInRange(hitColumn: number | undefined, requested: number, tolerance: number): boolean {
+  if (hitColumn === undefined) return true;
+  return Math.abs(hitColumn - requested) <= tolerance;
+}
+
 interface PausedFrame {
   from: string;
   type: string;
@@ -24,10 +31,42 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
   let threadActor: string | null = null;
   let pauseCtx: PauseInfo | null = null;
   const breakpoints = new Map<string, BreakpointEntry>();
+  const skipCounts = new Map<string, number>();
   const ee = rdp as unknown as EventEmitter;
 
   // Persistent paused-event handler — installed during attach, updates pauseCtx always.
   function onPausedEvent(f: PausedFrame): void {
+    const where = (f.frame ?? f.currentFrame)?.where;
+    const hitLine = where?.line;
+    const hitColumn = where?.column;
+
+    // Find tolerance-gated breakpoints that match this hit line.
+    const gated = Array.from(breakpoints.values()).filter(e =>
+      (e.columnTolerance ?? 0) > 0 &&
+      e.requestedColumn !== undefined &&
+      (e.actualLine ?? e.line) === hitLine,
+    );
+
+    if (gated.length > 0) {
+      const anyOk = gated.some(e =>
+        isInRange(hitColumn, e.requestedColumn!, e.columnTolerance!),
+      );
+      if (!anyOk) {
+        // Pick the first gated entry so MAX_SKIPS is tracked against a deterministic bp.
+        const target = gated[0]!;
+        const next = (skipCounts.get(target.bpId) ?? 0) + 1;
+        skipCounts.set(target.bpId, next);
+        if (next < MAX_SKIPS) {
+          // Silent internal resume; do not relay to public listeners.
+          void rdp.call(threadActor!, { type: 'resume' }).catch(() => { /* best-effort */ });
+          return;
+        }
+        // MAX_SKIPS reached → fall through and accept the current frame.
+      }
+      // Reset skip counters on any accept (in-range OR forced) for all gated bps.
+      for (const e of gated) skipCounts.delete(e.bpId);
+    }
+
     recordPauseCtx(f);
     // Notify any one-shot waiters.
     ee.emit('__pauseController.paused', f);
@@ -200,6 +239,7 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
         await rdp.call(entry.bpActor, { type: 'removeBreakpoint', location: loc });
       } catch { /* best-effort */ }
       breakpoints.delete(bpId);
+      skipCounts.delete(bpId);
     },
 
     listBreakpoints() { return Array.from(breakpoints.values()); },

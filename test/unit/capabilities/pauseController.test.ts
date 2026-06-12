@@ -402,3 +402,78 @@ describe('pauseController setBreakpointByText opts forwarding', () => {
     expect(bp.columnTolerance).toBe(50);
   });
 });
+
+describe('pauseController multi-hit auto-resume', () => {
+  function setupArmedBp(_tolerance: number) {
+    const rdp = fakeRdp();
+    rdp.call
+      .mockResolvedValueOnce({ from: 'thread-1' })
+      .mockResolvedValueOnce({ from: 'thread-1' });
+    rdp.call.mockResolvedValueOnce({
+      from: 'thread-1',
+      sources: [{ actor: 'src-1', url: '/x.js' }],
+    });
+    rdp.call.mockResolvedValueOnce({
+      from: 'src-1',
+      positions: [{ line: 4, column: 50 }],
+    });
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });
+    const pc = makePauseController(rdp as any, new ScriptCache());
+    return { pc, rdp };
+  }
+
+  it('auto-resumes when paused column falls outside [requested ± tolerance]', async () => {
+    const { pc, rdp } = setupArmedBp(5);
+    await pc.attach('thread-1');
+    await pc.setBreakpointByLocation('/x.js', 4, 50, { columnTolerance: 5 });
+
+    rdp.call.mockResolvedValueOnce({ from: 'thread-1' });  // internal resume
+    rdp.emit('thread-1.paused', {
+      from: 'thread-1', type: 'paused', actor: 'p1',
+      why: { type: 'breakpoint' },
+      frame: { actor: 'f1', where: { source: { url: '/x.js' }, line: 4, column: 80 } },
+    });
+    await new Promise(r => setTimeout(r, 10));
+    expect(rdp.call).toHaveBeenLastCalledWith('thread-1', { type: 'resume' });
+    expect(pc.getPausedInfo()).toBeNull();
+  });
+
+  it('accepts and emits when paused column is inside the tolerance window', async () => {
+    const { pc, rdp } = setupArmedBp(5);
+    await pc.attach('thread-1');
+    await pc.setBreakpointByLocation('/x.js', 4, 50, { columnTolerance: 5 });
+
+    rdp.emit('thread-1.paused', {
+      from: 'thread-1', type: 'paused', actor: 'p1',
+      why: { type: 'breakpoint' },
+      frame: { actor: 'f1', where: { source: { url: '/x.js' }, line: 4, column: 52 } },
+    });
+    await new Promise(r => setTimeout(r, 10));
+    const info = pc.getPausedInfo();
+    expect(info).not.toBeNull();
+    expect(info?.pauseActor).toBe('p1');
+  });
+
+  it('forces accept after MAX_SKIPS (=8) consecutive out-of-range hits', async () => {
+    const { pc, rdp } = setupArmedBp(5);
+    await pc.attach('thread-1');
+    await pc.setBreakpointByLocation('/x.js', 4, 50, { columnTolerance: 5 });
+
+    for (let i = 0; i < 9; i++) rdp.call.mockResolvedValueOnce({ from: 'thread-1' });
+
+    const baseCallCount = rdp.call.mock.calls.length;
+    for (let i = 0; i < 9; i++) {
+      rdp.emit('thread-1.paused', {
+        from: 'thread-1', type: 'paused', actor: `p${i}`,
+        why: { type: 'breakpoint' },
+        frame: { actor: 'f1', where: { source: { url: '/x.js' }, line: 4, column: 80 } },
+      });
+      await new Promise(r => setTimeout(r, 5));
+    }
+    const internalResumes = rdp.call.mock.calls.slice(baseCallCount)
+      .filter(c => c[1]?.type === 'resume').length;
+
+    expect(internalResumes).toBe(8);
+    expect(pc.getPausedInfo()).not.toBeNull();
+  });
+});

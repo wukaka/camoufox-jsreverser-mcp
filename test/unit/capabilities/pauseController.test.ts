@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { makePauseController } from '../../../src/capabilities/pauseController.js';
+import { __testing as pauseControllerTesting } from '../../../src/capabilities/pauseController.js';
 import { ScriptCache } from '../../../src/session/caches.js';
 
 interface FakeRdp { call: ReturnType<typeof vi.fn>; on: EventEmitter['on']; emit: EventEmitter['emit']; off: EventEmitter['off'] }
@@ -228,5 +229,31 @@ describe('pauseController', () => {
     await pc.attach('thread-1');
     await pc.freezeCurrent();
     expect(pc.getPausedInfo()).not.toBeNull();
+  });
+});
+
+describe('snapColumn', () => {
+  const { snapColumn } = pauseControllerTesting;
+
+  it('returns undefined when positions array is empty', () => {
+    expect(snapColumn([], 10)).toBeUndefined();
+  });
+
+  it('returns the only position when positions has length 1', () => {
+    expect(snapColumn([{ line: 4, column: 12 }], 5)).toBe(12);
+  });
+
+  it('returns the closest position to desiredCol', () => {
+    expect(snapColumn(
+      [{ line: 4, column: 4 }, { line: 4, column: 12 }, { line: 4, column: 20 }],
+      11,
+    )).toBe(12);
+  });
+
+  it('tie-breaks toward the position at or after desiredCol', () => {
+    expect(snapColumn(
+      [{ line: 4, column: 5 }, { line: 4, column: 15 }],
+      10,
+    )).toBe(15);
   });
 });

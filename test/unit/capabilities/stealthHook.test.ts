@@ -22,16 +22,24 @@ describe('stealthHook: renderPreload basics', () => {
     expect(src).not.toContain('Function.prototype.toString =');
   });
 
-  it('wrapNative + neutraliseTiming compose without redeclaring shared state', () => {
+  it('wrapNative + neutraliseTiming compose without globalThis pollution (M7.11)', () => {
     const sh = makeStealthHook();
     const src = sh.renderPreload({
       emitName: '__emit',
       neutraliseTiming: true,
       wraps: [{ targetPath: 'fetch' }, { targetPath: 'XMLHttpRequest.prototype.open' }],
     });
-    // single shared toString mask, two wraps + the timing fragment.
-    expect((src.match(/Function\.prototype\.toString = function/g) ?? []).length).toBe(2);
-    expect(src).toContain('__sh_timing__');
+    // M7.11: no globalThis.__sh_* anchor of any kind.
+    expect(src).not.toMatch(/globalThis\.__sh_/);
+    expect(src).not.toMatch(/__sh_mask__/);
+    expect(src).not.toMatch(/__sh_timing__/);
+    // Two wrap IIFEs were rendered; each installs its own closure-private mask.
+    // Each wrap's IIFE assigns its own fp.toString override (degradation
+    // accepted; see spec §4.3).
+    expect((src.match(/fp\.toString = override/g) ?? []).length).toBe(2);
+    // Timing fragment is present.
+    expect(src).toContain('MAX_GAP');
+    expect(src).toContain('virtNow');
   });
 });
 

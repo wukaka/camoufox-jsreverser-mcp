@@ -1,0 +1,43 @@
+{
+  "site": "https://abrahamjuliot.github.io/creepjs/",
+  "timestamp": "2026-06-12",
+  "context": "after inject_stealth_hook(window.fetch) + inject_stealth_to_workers(firefox-default) on M7.11 head 4299b58",
+  "main_world_acceptance": {
+    "fetch_toString": "function fetch() { [native code] }",
+    "fetch_name": "fetch",
+    "fetch_length": 1,
+    "toString_toString": "function toString() { [native code] }",
+    "has_sh_mask": false,
+    "has_sh_timing": false,
+    "sh_globals": [],
+    "toString_own_symbols": 0,
+    "verdict": "PASS — closure isolation + cleansed wrapper + no Symbol anchor all hold in main realm"
+  },
+  "iframe_realm_leak": {
+    "new_blank_iframe_fetch_toString": "function () { var a=arguments,b={channel:k,ts:Date.now(),target:p};try{b.args=[].slice.call(a)}catch(e){}try{b.stack=(new Error()).stack}catch(e){}var d;try{d=o.apply(this,a)}catch(e){b.threw=String(e);try{e2(b)}catch(_){}throw e}b.ret=d;try{e2(b)}catch(_){}return d }",
+    "page_iframes": [
+      {
+        "idx": 0,
+        "id": null,
+        "src": "about:blank",
+        "masked": "<wrapper source — same leak>"
+      }
+    ],
+    "verdict": "FAIL — emitCrossRealmInstaller did not patch iframe-realm Function.prototype.toString"
+  },
+  "creepjs_scoring": {
+    "headless_pct": 33,
+    "like_headless_pct": 0,
+    "stealth_pct": 20,
+    "resistance_extension": "d4ec0779",
+    "fp_id": "38a2d6a8",
+    "verdict": "REGRESSION matches stage4-creepjs-hardened baseline (stealth 0%→20%, extension unknown→d4ec0779)"
+  },
+  "diff_vs_stage4_baseline": "identical: M7.11 main-world fixes do not affect CreepJS verdict because the leak is cross-realm",
+  "root_cause_hypothesis": [
+    "emitCrossRealmInstaller probably installs via iframe.addEventListener(\"load\",...) + MutationObserver, but for an about:blank iframe (synchronous, no network) load may already have fired before install.",
+    "Or: maskInstallerExpr captured a reference to the OUTER realm Function.prototype.toString rather than calling the install routine against frameWin.Function.prototype.toString in the inner realm.",
+    "Next step: read src/capabilities/stealthHook.ts emitCrossRealmInstaller + emitToStringMasking and check whether installInFrame actually patches frameWin.Function.prototype.toString."
+  ],
+  "next_milestone": "M7.11.x cross-realm installer fix-up"
+}

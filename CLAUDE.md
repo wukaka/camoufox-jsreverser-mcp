@@ -29,7 +29,7 @@ Four layers, strictly separated. Pick the right layer when proposing a change:
 ```
 driver → capability → session → tool
   │         │           │         │
-  └ BiDi    └ 22 caps   └ caches  └ 82 tools across 14 groups
+  └ BiDi    └ 22 caps   └ caches  └ 84 tools across 14 groups
   └ RDP                 └ dispatcher
   └ launcher
 ```
@@ -83,7 +83,7 @@ Grouped roughly by where the wire traffic goes.
 - `taskArtifacts` — `src/capabilities/taskArtifacts.ts` — File-IO capability for rebuild bundles + evidence.
 - `hookRegistry` — `src/capabilities/hookRegistry.ts` — Renders a JS template that wraps `targetExpr` with a Proxy capturing configured fields. Samples shipped via `__hookRegistry` channel.
 
-## Tools (82, in 14 groups)
+## Tools (84, in 14 groups)
 
 | Group | Count | Path | Purpose |
 |---|---|---|---|
@@ -97,7 +97,7 @@ Grouped roughly by where the wire traffic goes.
 | prefs | 2 | `src/tools/prefs/` | `set_javascript_enabled`, `set_csp_enabled` (per-context, via BiDi). |
 | rebuild | 6 | `src/tools/rebuild/` | Bundle builder, env-diff, evidence-writer, report export — the "reproduce the algorithm locally" tools. |
 | scripts | 5 | `src/tools/scripts/` | `list_scripts`, `get_script_source`, `find_in_script`, `search_in_scripts`, `search_in_sources`. |
-| stealth | 5 | `src/tools/stealth/` | `list_stealth_presets`, `list_stealth_features`, `inject_stealth`, `inject_preload_script`, `set_user_agent`. |
+| stealth | 7 | `src/tools/stealth/` | `inject_stealth`, `inject_stealth_to_workers`, `inject_stealth_hook`, `inject_preload_script`, `list_stealth_presets`, `list_stealth_features`, `set_user_agent`. |
 | storage | 7 | `src/tools/storage/` | Cookie / localStorage / sessionStorage read+write + session state save/load/dump/restore. |
 | websocket | 4 | `src/tools/websocket/` | `list_websocket_connections`, `get_websocket_message`, `get_websocket_messages`, `analyze_websocket_messages`. |
 | workers | 2 | `src/tools/workers/` | Worker enumeration + WASM module listing. |
@@ -137,6 +137,8 @@ Grouped roughly by where the wire traffic goes.
 | M7.06 | `pauseController` Firefox 150 attach options + setBreakpoint thread routing. |
 | M7.07 | `pauseController` column-index fix via `getPossibleBreakpoints` snap + `columnTolerance` opt-in; objectInspector live restored. |
 | M7.08 | This file + README refresh. |
+| M7.09 | `stealth.applyPresetToWorkers` — push firefox-default preset to dedicated/shared worker realms; lazy workerTopology accessor for RDP swap. |
+| M7.10 | `inject_stealth_hook` + `inject_stealth_to_workers` MCP tools; README/CLAUDE.md rollup. |
 
 ## Where to look
 
@@ -159,6 +161,9 @@ Grouped roughly by where the wire traffic goes.
 - **Firefox 150 `setBreakpoint` column resolution**: an arbitrary column from `idx + 1` will be silently dropped if it doesn't land on a `Debugger.Source.getPossibleBreakpoints` position. `pauseController` snaps automatically (M7.07); pass `columnTolerance > 0` for the multi-hit auto-resume mode when you need to land on a specific spot in a packed multi-statement row.
 - **RDP greeting**: `Session.ensureRdp()` must run before any RDP-backed capability use (it consumes the Firefox 150 synchronous greeting packet; see M7.04).
 - **dotenv is loaded at process start** (`import 'dotenv/config'` in `src/index.ts`). Env-var overrides via shell still work — they take precedence over `.env` because dotenv does not overwrite already-set vars.
+- **Worker stealth is post-start.** `inject_stealth_to_workers` runs the payload via `script.callFunction` after the worker's prologue executed. Detection that reads `navigator.webdriver` in the worker's first synchronous tick will see `true`. This is a BiDi protocol limitation (`addPreloadScript` doesn't reach workers).
+- **Worker-stealth watch is session-scoped.** When `watch:true` (default), the subscription cleans up at Session shutdown. There is no per-call `stop_watching` — re-call the tool with `watch:false` for a one-shot, or restart the session.
+- **`inject_stealth_hook` is main-world-only in M7.10.** Use `inject_stealth_to_workers` for worker stealth presets; arbitrary hook wrap injection into workers needs its own milestone.
 
 ## License
 

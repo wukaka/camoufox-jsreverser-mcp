@@ -100,6 +100,17 @@ CLI flags:
 | `--user-agent <ua>` | Override the leaky `Camoufox/<ver>` UA brand on the launched profile. |
 | `--stealth <auto\|off>` | Apply the `firefox-default` preload on init (default `auto`). Does NOT control the always-on Camoufox C++ stealth. |
 
+## Stealth tools
+
+| Tool | Purpose |
+|---|---|
+| `inject_stealth` | Apply a stealth preset (default `firefox-default`) via BiDi preload. Main world only. |
+| `inject_stealth_to_workers` | Push the preset into dedicated/shared worker realms (post-start injection — workers' prologue has already run). `watch:true` auto-injects future workers until the session ends. |
+| `inject_stealth_hook` | Wrap a dotted global path (e.g. `window.fetch`) with a Function-toString-masking, channel-emitting Proxy. Optional `neutraliseTiming` ratchets `performance.now` / `Date.now` to hide debugger pauses. |
+| `inject_preload_script` | Inject arbitrary preload JS — escape hatch when the above don't fit. |
+| `list_stealth_presets` / `list_stealth_features` | Introspect the presets / features the capability knows. |
+| `set_user_agent` | Override the `Camoufox/<ver>` UA brand via BiDi emulation. |
+
 ## Test layers
 
 ```bash

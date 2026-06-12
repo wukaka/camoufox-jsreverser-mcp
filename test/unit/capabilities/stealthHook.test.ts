@@ -41,6 +41,54 @@ describe('stealthHook: renderPreload basics', () => {
     expect(src).toContain('MAX_GAP');
     expect(src).toContain('virtNow');
   });
+
+  it('wrapper body carries no stealth-tool identifier tokens (M7.11)', () => {
+    const sh = makeStealthHook();
+    const src = sh.wrapNative({
+      emitName: '__mcp_emit_abc',
+      targetPath: 'window.fetch',
+      channelName: 'fetch_calls',
+      capture: ['args', 'return', 'stack'],
+    });
+    // Substring scan: none of these identifiers should appear anywhere in the
+    // rendered source (renderSingleWrap is the worst-case detector target since
+    // its body leaks first via cross-realm probes that beat the iframe sweep).
+    expect(src).not.toMatch(/__capture/);
+    expect(src).not.toMatch(/__sample/);
+    expect(src).not.toMatch(/__args/);
+    expect(src).not.toMatch(/__ret/);
+    expect(src).not.toMatch(/__emit\b/); // __emit identifier, not __mcp_emit_<hex> global name
+    expect(src).not.toMatch(/Reflect\.apply/);
+    // Channel name should NOT appear as a string literal inside the wrapper
+    // function body — only as a closure-captured const above it.
+    const wrapperBodyStart = src.indexOf('var __wrapped = function () {');
+    const wrapperBodyEnd = src.indexOf('};', wrapperBodyStart);
+    const body = src.slice(wrapperBodyStart, wrapperBodyEnd);
+    expect(body).not.toContain('fetch_calls');
+  });
+
+  it('renderPreload contains the cross-realm installer scaffolding (M7.11)', () => {
+    const sh = makeStealthHook();
+    const src = sh.renderPreload({ emitName: '__emit', wraps: [{ targetPath: 'fetch' }] });
+    expect(src).toContain('installInRealm');
+    expect(src).toMatch(/querySelectorAll\(['"]iframe['"]\)/);
+    expect(src).toContain('MutationObserver');
+    expect(src).toContain('contentWindow');
+    expect(src).toContain('addEventListener');
+  });
+
+  it('renderPreload assigns nothing to globalThis (M7.11)', () => {
+    const sh = makeStealthHook();
+    const src = sh.renderPreload({
+      emitName: '__emit',
+      neutraliseTiming: true,
+      wraps: [{ targetPath: 'fetch' }, { targetPath: 'XMLHttpRequest.prototype.open' }],
+    });
+    // No assignments of any form `globalThis.<identifier> =`.
+    // (`Object.defineProperty(globalThis, ...)` would also be a leak — same regex.)
+    expect(src).not.toMatch(/globalThis\.\w+\s*=/);
+    expect(src).not.toMatch(/Object\.defineProperty\(\s*globalThis/);
+  });
 });
 
 describe('stealthHook: wrapped function survives toString detection', () => {

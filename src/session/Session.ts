@@ -95,7 +95,9 @@ export class Session {
     this.caps.scriptHost = scriptHost;
     const preloadInjector = makePreloadInjector(this.bidi, scriptHost);
     this.caps.preloadInjector = preloadInjector;
-    const stealth = makeStealth(preloadInjector);
+    const workerTopology = makeWorkerTopology(scriptHost);
+    this.caps.workerTopology = workerTopology;
+    const stealth = makeStealth(preloadInjector, () => this.caps.workerTopology);
     this.caps.stealth = stealth;
     this.caps.stealthHook = makeStealthHook();
     this.caps.astAnalyzer = makeAstAnalyzer();
@@ -113,8 +115,6 @@ export class Session {
       table: this.wsTable,
       emitName: this.emitName,
     });
-    const workerTopology = makeWorkerTopology(scriptHost);
-    this.caps.workerTopology = workerTopology;
     this.caps.hookRegistry = makeHookRegistry({
       dispatcher: this.dispatcher,
       preload: preloadInjector,

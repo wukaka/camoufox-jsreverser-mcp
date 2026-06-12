@@ -6,6 +6,7 @@ import {
   CapabilityUnavailableError, NotPausedError, PauseContextLostError,
   BreakpointUnresolvedError, TargetNotFoundError, WorkerNotAttachedError,
   PrefsActorUnavailableError, LlmNotConfiguredError, LlmFailedError, AstParseFailedError,
+  StealthWorkersUnavailableError,
 } from '../capabilities/errors.js';
 import {
   ResourceNotFoundError, ScriptNotCollectedYetError, BrowserNotReadyError,
@@ -37,6 +38,10 @@ export function translateError(err: Error): ToolResult<never> {
     return fail(ErrorReason.WorkerNotAttached, { details: { workerId: err.workerId } });
   if (err instanceof PrefsActorUnavailableError)
     return fail(ErrorReason.PrefsActorUnavailable);
+  if (err instanceof StealthWorkersUnavailableError)
+    return fail(ErrorReason.StealthWorkersUnavailable, {
+      hint: 'workerTopology not wired — Session may be pre-init or in BiDi-only mode without workers',
+    });
   if (err instanceof LlmNotConfiguredError)
     return fail(ErrorReason.LlmNotConfigured, { hint: 'Configure LLM_PROVIDER and credentials in .env' });
   if (err instanceof LlmFailedError)

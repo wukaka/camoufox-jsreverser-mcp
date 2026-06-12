@@ -48,30 +48,40 @@ function emitResolveTarget(targetPath: string): string {
   `;
 }
 
-/** Emit the JS that registers `wrapped` in `toStringMap` so that
+/** Emit the JS that registers `wrapped` in a closure-private mask map so that
  *  `Function.prototype.toString.call(wrapped)` reports a native-code body
- *  identical to the original's. */
+ *  identical to the original's. No globalThis pollution, no named property
+ *  on Function.prototype.toString.
+ *
+ *  Cross-IIFE behaviour: each preload payload installs its own independent
+ *  override of Function.prototype.toString. If two inject_stealth_hook calls
+ *  happen in the same session, the second override wins; wraps registered
+ *  by the first payload then fall back to the realFnToString path and reveal
+ *  their wrapper source. This is an acceptable degradation because §4.2
+ *  cleansing means the leaked wrapper source carries no stealth-toolchain
+ *  identifier tokens. Avoiding the degradation would require an enumerable
+ *  anchor (Symbol.for / named property) on Function.prototype.toString,
+ *  which Object.getOwnPropertySymbols / Symbol.keyFor would then expose to
+ *  the page — a worse leak than the degradation. */
 function emitToStringMasking(): string {
-  // Shared map across all wraps installed by the same preload payload.
   return `
-    var __maskFn = (globalThis.__sh_mask__ || (globalThis.__sh_mask__ = (function () {
+    var __maskFn = (function () {
+      var fp = Function.prototype;
+      var realFnToString = fp.toString;
+      var realCall = fp.call;
       var map = new WeakMap();
-      // Install a single Function.prototype.toString override. We always grab the
-      // ORIGINAL toString here so chained installs don't compose.
-      var realFnToString = Function.prototype.toString;
-      var realCall = Function.prototype.call;
-      Function.prototype.toString = function () {
+      var override = function () {
         var masked = map.get(this);
         if (masked !== undefined) return masked;
         return realCall.call(realFnToString, this);
       };
       // Mask the override itself so toString.toString() also looks native.
-      map.set(Function.prototype.toString, 'function toString() { [native code] }');
+      map.set(override, 'function toString() { [native code] }');
+      fp.toString = override;
       return function maskAs(target, asNativeName) {
         map.set(target, 'function ' + asNativeName + '() { [native code] }');
       };
-    })()));
-    Object.defineProperty(globalThis, '__sh_mask__', { enumerable: false, configurable: false });
+    })();
   `;
 }
 
@@ -130,11 +140,14 @@ function renderSingleWrap(emitName: string, wrap: StealthHookWrapSpec): string {
 
 /** Render an IIFE that hides debugger-induced timing jumps in the same preload
  *  payload. Hooks the four standard high-resolution clocks and routes them
- *  through a ratchet that caps the per-tick gap. */
+ *  through a ratchet that caps the per-tick gap.
+ *
+ *  M7.11: removed the globalThis.__sh_timing__ re-entry flag. Re-running the
+ *  IIFE in the same realm is idempotent — the second run captures the first
+ *  run's (already-wrapped) performance.now as its realPerfNow, so the ratchet
+ *  composes. No correctness issue; small accuracy cost on the second wrap. */
 function renderTimingNeutraliser(maxGapMs: number): string {
   return `(function () {
-    if (globalThis.__sh_timing__) return;
-    Object.defineProperty(globalThis, '__sh_timing__', { value: true, enumerable: false });
     var realDateNow = Date.now;
     var realPerfNow = typeof performance !== 'undefined' && performance.now ? performance.now.bind(performance) : null;
     if (!realPerfNow) return;

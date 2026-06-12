@@ -92,6 +92,10 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
 
     async setBreakpointByLocation(sourceUrl, line, column, opts) {
       if (!threadActor) throw new Error('pauseController: not attached');
+      // Firefox 150 routes setBreakpoint through the thread actor (the legacy
+      // <source>.setBreakpoint packet was removed). We still resolve the source
+      // ahead of time so we can fail fast with noScript when the URL is unknown
+      // and so removeBreakpoint can route through the same location object.
       const sourcesReply = await rdp.call<{ sources: Array<{ actor: string; url: string }> }>(
         threadActor, { type: 'sources' },
       );
@@ -146,6 +150,10 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
         throw new BreakpointUnresolvedError(reply.error as 'noScript' | 'noCodeAtLineColumn', { sourceUrl, line });
       }
       const bpId = `bp-${randomBytes(4).toString('hex')}`;
+      // Firefox 150 does not return a bp actor; the thread owns the breakpoint
+      // and identifies it by location alone. Keep the bpActor field non-empty so
+      // the public BreakpointEntry shape stays stable; threadActor doubles as
+      // the owner that removeBreakpoint targets.
       const entry: BreakpointEntry = {
         bpId,
         bpActor: threadActor,
@@ -156,7 +164,7 @@ export function makePauseController(rdp: RdpDriver, scripts: ScriptCache): Pause
         ...(column !== undefined ? { requestedColumn: column } : {}),
         actualLine: line,
         ...(actualColumn !== undefined ? { actualColumn } : {}),
-        ...((opts as BreakpointOptions | undefined)?.columnTolerance ? { columnTolerance: opts!.columnTolerance } : {}),
+        ...(opts?.columnTolerance ? { columnTolerance: opts.columnTolerance } : {}),
       };
       breakpoints.set(bpId, entry);
       return entry;

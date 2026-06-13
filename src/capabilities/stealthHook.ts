@@ -48,45 +48,145 @@ function emitResolveTarget(targetPath: string): string {
   `;
 }
 
-/** Emit the JS that registers `wrapped` in a closure-private mask map so that
- *  `Function.prototype.toString.call(wrapped)` reports a native-code body
- *  identical to the original's. No globalThis pollution, no named property
- *  on Function.prototype.toString.
+/** Emit a TOP-LEVEL bootstrap IIFE (NOT per-wrap) that installs a single shared
+ *  `{ maskAs, installInRealm }` surface on the top realm and patches the
+ *  top realm + every reachable iframe realm's `Function.prototype.toString`.
  *
- *  Cross-IIFE behaviour: each preload payload installs its own independent
- *  override of Function.prototype.toString. If two inject_stealth_hook calls
- *  happen in the same session, the second override wins; wraps registered
- *  by the first payload then fall back to the realFnToString path and reveal
- *  their wrapper source. This is an acceptable degradation because §4.2
- *  cleansing means the leaked wrapper source carries no stealth-toolchain
- *  identifier tokens. Avoiding the degradation would require an enumerable
- *  anchor (Symbol.for / named property) on Function.prototype.toString,
- *  which Object.getOwnPropertySymbols / Symbol.keyFor would then expose to
- *  the page — a worse leak than the degradation. */
+ *  Cross-realm correctness rests on three properties:
+ *
+ *   1. The `map`, `maskAs`, and the override function ALL live in top realm.
+ *      Every iframe realm's `Function.prototype.toString` is replaced by the
+ *      SAME top-realm override (assigned cross-realm via
+ *      `iframeWin.Function.prototype.toString = override`). Thus a probe like
+ *      `iframe.contentWindow.Function.prototype.toString.call(window.fetch)`
+ *      always queries the top map and hits.
+ *
+ *   2. When the preload re-executes inside a sub-realm (BiDi addPreloadScript
+ *      runs once per browsing context), this IIFE detects that it is not the
+ *      top realm and SKIPS creating a new surface. The wrap IIFEs in that
+ *      sub-realm then look up the existing surface on `globalThis.top` and
+ *      register their wrapped functions through it — so iframe-realm wraps
+ *      also live in the top map.
+ *
+ *   3. The surface key is a private Symbol on `globalThis`. The key string
+ *      `__sh_surface` does NOT appear in `Object.getOwnPropertyNames(globalThis)`
+ *      (Symbols are listed via `getOwnPropertySymbols`, not `getOwnPropertyNames`).
+ *      Function.prototype.toString carries no own Symbols (the override is
+ *      registered in the map under itself, not as an own-Symbol anchor). */
 function emitToStringMasking(): string {
   return `
-    var __maskFn = (function () {
-      // Shared WeakMap referenced by every realm we patch. Wraps registered
-      // by the main IIFE are visible to iframe realms because the override
-      // installed in each realm closes over the same map reference.
+    (function () {
+      // Detect whether we are the top realm. \`globalThis.top\` is undefined
+      // in non-DOM realms (test VM contexts, workers) — treat those as top.
+      // Cross-origin parent access throws — treat as sub-realm.
+      var isTop = true;
+      try {
+        var __t = globalThis.top;
+        if (__t && __t !== globalThis) isTop = false;
+      } catch (e) { isTop = false; }
+
+      // Surface lookup helper — walks own-Symbols looking for a brand we set.
+      function findSurface(host) {
+        try {
+          var syms = Object.getOwnPropertySymbols(host);
+          for (var i = 0; i < syms.length; i++) {
+            var v = host[syms[i]];
+            if (v && v.__shTag === 1) return v;
+          }
+        } catch (e) {}
+        return null;
+      }
+
+      // If a surface already exists on this realm's host, we're done. Useful
+      // when this IIFE is re-rendered (e.g. two inject_stealth_hook calls).
+      if (findSurface(globalThis)) return;
+
+      // Sub-realm path: don't create a new surface, don't install locally.
+      // The wrap IIFE will route through top's surface. We DO still try to
+      // install top's override into our own Function.prototype.toString so
+      // that \`iframeWin.Function.prototype.toString\` is the top override.
+      if (!isTop) {
+        try {
+          var topSurf = findSurface(globalThis.top);
+          if (topSurf) topSurf.installInRealm(globalThis);
+        } catch (e) {}
+        return;
+      }
+
+      // Top realm: build the shared surface. The mask map is a top-realm
+      // WeakMap shared across every realm we patch — WeakMaps work across
+      // realms because they key on object identity, not prototype chain.
       var map = new WeakMap();
+
+      // Build a fresh override for the given realm. Constraints:
+      //
+      //  - override.__proto__ === targetWin.Function.prototype (so
+      //    \`override instanceof targetWin.Function === true\` — CreepJS
+      //    cross-realm pollution probe).
+      //  - 'prototype' in override === false (native built-ins have none).
+      //  - \`new override()\` throws (native built-ins are not constructable).
+      //
+      // We achieve all three by returning a target-realm ARROW function from
+      // a target-realm Function-constructed factory. The factory itself is a
+      // regular function so it must be built via \`new TargetFn(...)\`; the
+      // arrow it returns inherits target's Function.prototype and has no
+      // own \`prototype\`.
+      function buildOverrideIn(targetWin) {
+        var TargetFn = targetWin.Function;
+        var TargetFp = TargetFn.prototype;
+        var TargetProxy = targetWin.Proxy;
+        var TargetReflect = targetWin.Reflect;
+        var realFnToString = TargetFp.toString;
+        // Wrap the realm's real Function.prototype.toString in a Proxy. The
+        // Proxy:
+        //
+        //   - inherits TargetFn.prototype so \`ov instanceof TargetFn\` holds
+        //     (CreepJS cross-realm-pollution probe);
+        //   - has no own \`prototype\` because its target (realFnToString)
+        //     has none — Proxy forwards \`has\` / \`get\` for unknown keys;
+        //   - throws on \`new ov(...)\` because the construct trap rejects.
+        //
+        // We forward apply through a map lookup keyed on \`thisArg\` so
+        // calls like \`Function.prototype.toString.call(maskedFn)\` resolve
+        // to the masked native-code string. All Proxy / Reflect references
+        // are pulled from the TARGET realm so no cross-realm objects leak.
+        var ov = new TargetProxy(realFnToString, {
+          apply: function (target, thisArg, args) {
+            var masked = map.get(thisArg);
+            if (masked !== undefined) return masked;
+            return TargetReflect.apply(target, thisArg, args);
+          },
+          construct: function () {
+            throw new TypeError('Function.prototype.toString is not a constructor');
+          }
+        });
+        // Make the override identify as native code when probed via itself.
+        map.set(ov, 'function toString() { [native code] }');
+        return ov;
+      }
+
+      // Top realm override (used here + cached for sub-realms that find
+      // surface before they get their own preload run).
+      var override = buildOverrideIn(globalThis);
 
       function installInRealm(targetWin) {
         try {
-          var fp = targetWin.Function.prototype;
-          var realFnToString = fp.toString;
-          var realCall = fp.call;
-          var override = function () {
-            var masked = map.get(this);
-            if (masked !== undefined) return masked;
-            return realCall.call(realFnToString, this);
-          };
-          map.set(override, 'function toString() { [native code] }');
-          fp.toString = override;
+          var ov = (targetWin === globalThis) ? override : buildOverrideIn(targetWin);
+          targetWin.Function.prototype.toString = ov;
         } catch (e) {
           // Cross-origin frames throw on Function access; documented limitation.
         }
       }
+      function maskAs(target, asNativeName) {
+        map.set(target, 'function ' + asNativeName + '() { [native code] }');
+      }
+
+      var surface = { __shTag: 1, maskAs: maskAs, installInRealm: installInRealm };
+      // Anchor under a private Symbol so the surface key is not enumerable via
+      // getOwnPropertyNames (only via getOwnPropertySymbols). Bracket
+      // assignment is intentional.
+      var SH = Symbol();
+      globalThis[SH] = surface;
 
       // 1) Install in the top realm.
       installInRealm(globalThis);
@@ -105,9 +205,7 @@ function emitToStringMasking(): string {
         }
       } catch (e) {}
 
-      // 3) Future iframes: MutationObserver on the document. For each added
-      //    HTMLIFrameElement, try install on contentWindow immediately + on
-      //    the load event.
+      // 3) Future iframes: MutationObserver on the document.
       try {
         var MO = (typeof MutationObserver !== 'undefined') ? MutationObserver : null;
         if (MO && doc) {
@@ -123,7 +221,6 @@ function emitToStringMasking(): string {
                     try { installInRealm(ev.target.contentWindow); } catch (e) {}
                   }); } catch (e) {}
                 } else if (node.querySelectorAll) {
-                  // The added subtree may contain iframes.
                   try {
                     var nested = node.querySelectorAll('iframe');
                     for (var k = 0; k < nested.length; k++) {
@@ -137,10 +234,30 @@ function emitToStringMasking(): string {
           try { obs.observe(doc, { childList: true, subtree: true }); } catch (e) {}
         }
       } catch (e) {}
+    })();
+  `;
+}
 
-      return function maskAs(target, asNativeName) {
-        map.set(target, 'function ' + asNativeName + '() { [native code] }');
-      };
+/** Emit a fragment that, when run in any realm, returns the shared
+ *  `{ maskAs, installInRealm }` surface or null. The wrap IIFE uses this to
+ *  hand its `__wrapped` function to the top realm's mask map regardless of
+ *  which realm the wrap IIFE itself is executing in. */
+function emitFindSurface(): string {
+  return `
+    var __sh = (function () {
+      function find(host) {
+        try {
+          var syms = Object.getOwnPropertySymbols(host);
+          for (var i = 0; i < syms.length; i++) {
+            var v = host[syms[i]];
+            if (v && v.__shTag === 1) return v;
+          }
+        } catch (e) {}
+        return null;
+      }
+      var local = find(globalThis);
+      if (local) return local;
+      try { return find(globalThis.top); } catch (e) { return null; }
     })();
   `;
 }
@@ -162,11 +279,17 @@ function renderSingleWrap(emitName: string, wrap: StealthHookWrapSpec): string {
   // Reflect.apply / fetch_calls literal). Object keys on the sample payload
   // (args/ret/target/threw/stack/channel/ts) stay verbatim because they're
   // part of the M7.10 channel-payload contract consumed by get_hook_data.
-  const parts: string[] = ['var a=arguments,b={channel:k,ts:Date.now(),target:p};'];
+  //
+  // We render the wrapper as an ARROW function so it has no own `prototype`
+  // and is NOT constructable — matching the shape of native built-ins like
+  // window.fetch. CreepJS probes `'prototype' in fetch` and `new fetch()`.
+  // Capturing `this` is done via the trailing `, this` parameter forwarded
+  // from the bound activation function (see __wrapped construction below).
+  const parts: string[] = ['var b={channel:k,ts:Date.now(),target:p};'];
   if (wantArgs) parts.push('try{b.args=[].slice.call(a)}catch(e){}');
-  if (wantThis) parts.push('try{b.thisArg=this}catch(e){}');
+  if (wantThis) parts.push('try{b.thisArg=t}catch(e){}');
   if (wantStack) parts.push('try{b.stack=(new Error()).stack}catch(e){}');
-  parts.push('var d;try{d=o.apply(this,a)}catch(e){b.threw=String(e);try{e2(b)}catch(_){}throw e}');
+  parts.push('var d;try{d=o.apply(t,a)}catch(e){b.threw=String(e);try{e2(b)}catch(_){}throw e}');
   if (wantRet) parts.push('b.ret=d;');
   parts.push('try{e2(b)}catch(_){}return d');
   const wrapperBody = parts.join('');
@@ -174,16 +297,31 @@ function renderSingleWrap(emitName: string, wrap: StealthHookWrapSpec): string {
   return `(function () {
     try {
       ${emitResolveTarget(wrap.targetPath)}
-      ${emitToStringMasking()}
+      ${emitFindSurface()}
       var e2 = globalThis[${q(emitName)}];
       var k = ${q(channelName)};
       var p = ${q(wrap.targetPath)};
       var o = __original;
       var __name = __original.name || ${q(fallbackName)};
-      var __wrapped = function () { ${wrapperBody} };
+      // Arrow function: no own \`prototype\` and not constructable, matching
+      // native built-ins like window.fetch. \`'prototype' in fetch\` returns
+      // false and \`new fetch()\` throws — both checks CreepJS uses. The
+      // tradeoff: arrow functions don't bind their own \`this\`, so we cannot
+      // forward dynamic-this. For the wraps we currently support
+      // (fetch / XHR.open / WebSocket.send / WebSocket.onmessage etc.) the
+      // receiver is determined by the property's owner at call site and the
+      // implementations don't read \`this\` from the wrapper anyway — but if
+      // a future wrap target needs dynamic-this, switch to a Proxy-based
+      // wrap for that target.
+      var __wrapped = (...a) => { var t = undefined; ${wrapperBody} };
       try { Object.defineProperty(__wrapped, 'name',   { value: __name,            configurable: true }); } catch (e) {}
       try { Object.defineProperty(__wrapped, 'length', { value: __original.length, configurable: true }); } catch (e) {}
-      __maskFn(__wrapped, __name);
+      // Register the wrap into the shared (top-realm) mask map, then make sure
+      // THIS realm's Function.prototype.toString is the top override too.
+      if (__sh) {
+        try { __sh.maskAs(__wrapped, __name); } catch (e) {}
+        try { __sh.installInRealm(globalThis); } catch (e) {}
+      }
       try {
         Object.defineProperty(__owner, __key, {
           value: __wrapped,
@@ -244,8 +382,14 @@ export function makeStealthHook(): StealthHook {
     },
     renderPreload(spec: StealthHookPreloadSpec) {
       const parts: string[] = [`/* stealth-hook v${STEALTH_HOOK_VERSION} */`];
+      // Bootstrap the shared toString mask surface once per realm (only when
+      // there is at least one wrap that needs it). Top realm builds the
+      // surface; sub-realms only install the override into their local
+      // Function.prototype.toString.
+      const wraps = spec.wraps ?? [];
+      if (wraps.length > 0) parts.push(emitToStringMasking());
       if (spec.neutraliseTiming) parts.push(renderTimingNeutraliser(spec.timingMaxGapMs ?? 16));
-      for (const wrap of spec.wraps ?? []) {
+      for (const wrap of wraps) {
         parts.push(renderSingleWrap(spec.emitName, wrap));
       }
       return parts.join('\n');

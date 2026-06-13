@@ -33,10 +33,12 @@ describe('stealthHook: renderPreload basics', () => {
     expect(src).not.toMatch(/globalThis\.__sh_/);
     expect(src).not.toMatch(/__sh_mask__/);
     expect(src).not.toMatch(/__sh_timing__/);
-    // Two wrap IIFEs were rendered; each installs its own closure-private mask.
-    // Each wrap's IIFE assigns its own fp.toString override (degradation
-    // accepted; see spec §4.3).
-    expect((src.match(/fp\.toString = override/g) ?? []).length).toBe(2);
+    // M7.11.x cross-realm fix: a single shared mask surface is bootstrapped
+    // once at the top of renderPreload; both wrap IIFEs register into it
+    // (not into per-wrap private maps). installInRealm assigns the realm's
+    // own override (built via that realm's Function constructor) exactly
+    // once per installInRealm call.
+    expect((src.match(/targetWin\.Function\.prototype\.toString = ov/g) ?? []).length).toBe(1);
     // Timing fragment is present.
     expect(src).toContain('MAX_GAP');
     expect(src).toContain('virtNow');

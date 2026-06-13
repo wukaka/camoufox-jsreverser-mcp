@@ -6,3 +6,23 @@ coverage/
 artifacts/tasks/
 !artifacts/tasks/_TEMPLATE/
 .DS_Store
+
+# Claude Code
+.claude/
+.claudecode/
+CLAUDE.local.md
+.mcp.json
+.aider*
+.cursor/
+.cursorrules
+.windsurf/
+
+# Test / build caches
+.vitest/
+.vitest-cache/
+.cache/
+.turbo/
+.tsbuildinfo
+*.tsbuildinfo
+.eslintcache
+.npm/

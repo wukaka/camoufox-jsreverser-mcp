@@ -3,32 +3,19 @@
 Front-end JavaScript reverse-engineering MCP server for Firefox, backed by WebDriver BiDi
 and the Firefox Remote Debugging Protocol (RDP).
 
-It exposes 88 tools across page state, scripts, hooks, debugger, network, WebSocket,
-console/runtime, DOM, storage/session, stealth, AST + AI, rebuild + evidence, workers,
-and per-context preferences (`set_javascript_enabled` / `set_csp_enabled`).
+It exposes ~88 MCP tools covering:
 
-## Architecture
-
-```
-driver → capability → session → tool
-  │         │           │         │
-  └ BiDi    └ ~22 caps  └ caches  └ MCP-exposed tools
-  └ RDP                 └ dispatcher
-  └ launcher
-```
-
-- **Drivers**: `BidiDriver` (WebSocket / id-paired), `RdpDriver` (length-prefixed JSON
-  framing, actor FIFO), `FirefoxLauncher`.
-- **Capabilities**: `scriptHost`, `preloadInjector`, `networkObserver`, `logSink`,
-  `storageAccess`, `pageController`, `domAccess`, `hookRegistry`, `wsObserver`,
-  `workerTopology`, `pauseController`, `objectInspector`, `eventMonitor`,
-  `performanceProbe`, `initiatorTracer`, `runtimePrefs`, `stealth`, `astAnalyzer`,
-  `cryptoSignatures`, `llmProvider`, `taskArtifacts`.
-- **Session**: in-process singleton holding driver instances, capability instances,
-  the script / request / hook / WebSocket / console / session-snapshot caches, the
-  pause context, and session-scoped pref overrides.
-- **Tools**: thin wrappers that read inputs, call one capability, return a
-  `ToolResult` (`ok=true` + data, or `ok=false` + ErrorReason).
+- Page state, frames, navigation, screenshots
+- Scripts: list / get source / search / find-in-script
+- Debugger: breakpoints (text + line/col), pause / resume / step, callframe evaluate, object inspect
+- Hooks: function hook, trace, sample channel, inject arbitrary preload
+- Network + WebSocket: request pool, initiator stack, frame capture, XHR break
+- DOM: query / structure / click / type / wait
+- Storage + per-session save/load/dump/restore
+- Stealth: `firefox-default` preset + cross-realm `inject_stealth_hook` + worker push
+- AST + LLM: deobfuscate, summarize, understand, crypto-rule detection
+- Rebuild + evidence: bundle builder, env diff, evidence writer, report export
+- Workers, prefs (`set_javascript_enabled` / `set_csp_enabled`)
 
 ## Why Camoufox (and not raw Firefox)
 
@@ -150,25 +137,6 @@ unit suite stays green on developer machines without a browser install.
 
 CI runs all three layers across Firefox `latest` + `latest-esr` (see
 `.github/workflows/ci.yml`).
-
-## Project layout
-
-```
-src/
-  drivers/{bidi,rdp,launcher}/   driver implementations
-  capabilities/                  ~22 capability modules
-  session/                       Session + caches + dispatcher
-  server/                        MCP plumbing (tool-registry, error-translator)
-  tools/                         all MCP-exposed tools, grouped by category
-  stealth-scripts/               firefox-default stealth preload payloads
-  ast/                           transforms/ and rules/ for astAnalyzer + cryptoSignatures
-  llm/                           provider abstraction + LRU cache
-  rebuild/                       bundle-builder, env-diff, evidence-writer
-test/
-  unit/                          Layer 1 — pure logic, ~140 files / ~480 tests
-  integration/                   Layer 2 — driver + capability contracts vs real Firefox
-  e2e/                           Layer 3 — W1–W7 workflow suites over stdio MCP
-```
 
 ## License
 

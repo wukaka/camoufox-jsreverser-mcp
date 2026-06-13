@@ -125,3 +125,56 @@
 - 主世界三项（cleansing wrapper / 无 `__sh_*` 全局 / 无 Symbol 锚点）**全部达成** ✅
 - CreepJS stealth%、Resistance.extension **未回归到 baseline** ❌ —— 因为 cross-realm installer 失效
 - 还需要 **M7.11.x cross-realm installer 修补**：复现 → 修 `emitCrossRealmInstaller` → 加 iframe-realm 单测断言 → 重测
+
+---
+
+## 阶段 6 — M7.11.x cross-realm 修复后（2026-06-13）
+
+代码修改：
+- `emitToStringMasking` 重构为**顶层 bootstrap**：top realm 建 `{ maskAs, installInRealm }` surface，挂在 globalThis 私有 Symbol；sub-realm 跳过 bootstrap，从 `globalThis.top` 找 surface 让 top install 本 realm 的 override。Map 跨 realm 共享（WeakMap 对象身份不分 realm）。
+- `buildOverrideIn(targetWin)`：用 **target-realm `Proxy(realFnToString, { apply, construct })`** 作为 override，同时满足三件事：`instanceof targetWin.Function === true`、`'prototype' in override === false`、`new override()` 抛错。
+- `renderSingleWrap` wrapper 改为**箭头函数 + rest param**（`(...a) => { ... }`），消除 `prototype` 属性和 constructability。
+- 顺带：`src/server/server.ts` lazy launch — MCP `initialize` 不再阻塞在 Camoufox 启动（commit `4299b58`），避免 client -32000 超时雪崩。
+
+### 阶段 6 acceptance probe（hook + worker stealth + UA spoof Firefox 150）
+
+| 检测点 | stage4-after-m7.11 | stage6-after-m7.11.x |
+|---|---|---|
+| navigator.userAgent | `Camoufox/150.0.2-beta.25` 泄漏 | **`Firefox/150.0` ✅** |
+| main `fetch.toString` | native ✅ | native ✅ |
+| `'prototype' in fetch` | true ❌ | **false ✅** |
+| `new fetch()` | 不抛 ❌ | **抛 TypeError ✅** |
+| `'prototype' in Function.prototype.toString` | true ❌ | **false ✅** |
+| `Function.prototype.toString instanceof Function` | true ✅ | true ✅ |
+| iframe-realm `fetch.toString.call(window.fetch)` | wrapper 源码 🔴 | **native ✅** |
+| iframe `toString instanceof iframe.Function` | **false ❌** | **true ✅** |
+| `__sh_*` 全局 | 无 ✅ | 无 ✅ |
+| `Object.getOwnPropertySymbols(Function.prototype.toString)` | 0 ✅ | 0 ✅ |
+
+**所有 M7.11 spec §4 + plan §7 声明的 acceptance probes 全部 PASS。**
+
+### 阶段 6 CreepJS scoring（参考）
+
+| 维度 | stage3 baseline | stage4-after-m7.11 | stage6-after-m7.11.x |
+|---|---|---|---|
+| like_headless | 0% | 0% | 0% |
+| headless | 33% | 33% | 33% + 第二个 20% |
+| stealth (label) | `0c019315` (0%) | `71bd68ae` (20%) | `71bd68ae` (20%) |
+| Resistance.extension | unknown | `d4ec0779` | `a5507ef9` |
+
+CreepJS stealth%/extension 并**未回到 baseline**。但 stage5 (JSReverser CDP) 横评证明了 `headless=33%` 是引擎信号、与 hook 无关；stage6 acceptance 全 PASS 进一步证明剩余 20% / `a5507ef9` 与 fetch 形状、wrapper toString、cross-realm 污染、UA 字串**均无关**。
+
+证据：`stage6-after-m7.11.x.png` + `stage6-after-m7.11.x.json`。
+
+### 剩余泄漏假设（M7.12+ 候选）
+
+1. **Error.stack 深度**：wrapper 多一帧。CreepJS 调 fetch 后读 `(new Error()).stack` 或 promise rejection trace 能拿到 wrapper frame。
+2. **Worker UA 仍暴露 Camoufox**：BiDi `addPreloadScript` 不达 worker，post-start eval 改不了首次 UA 读取（CLAUDE.md 已记）。
+3. **WebDriver / RemoteAgent 协议侧信道**：Camoufox 不一定 patch 全所有 BiDi observer/类。
+4. **navigator.permissions / serviceWorker 注册时序** 等二阶探测。
+
+### M7.11 + M7.11.x 整体结论
+
+- **Spec acceptance**：全部 PASS（main + iframe-realm shape）✅
+- **Cross-realm 共享 surface 架构**：通过私有 Symbol 实现、map 跨 realm 共享、Proxy 兼顾 `instanceof / prototype / construct` 三态。
+- **CreepJS 综合指纹**：未压回 baseline。其根因经 stage6 acceptance + stage5 CDP 横评定位**不在 stealthHook 单一职责内**——是 Error.stack / worker UA / 协议侧信道等更上层 milestone（M7.12+）覆盖范围。

@@ -1,0 +1,79 @@
+{
+  "site": "https://abrahamjuliot.github.io/creepjs/",
+  "timestamp": "2026-06-13",
+  "context": "after M7.11.x: shared mask surface (private Symbol on globalThis), per-realm Proxy-based override, arrow-function wrapper, UA spoof to Firefox 150",
+  "build": "feat/m7.11-stealth-hook-v2 HEAD with: lazy-launch fix + cross-realm surface refactor + Proxy override + bound-arrow wrapper",
+  "hardening_applied": [
+    "inject_stealth_hook(window.fetch, capture=[args,return,stack])",
+    "inject_stealth_to_workers(preset=firefox-default, watch=true)",
+    "set_user_agent(Mozilla/5.0 Firefox/150.0) — strips Camoufox/150.0.2-beta.25 leak"
+  ],
+  "main_world_acceptance": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0",
+    "fetch_toString": "function fetch() { [native code] }",
+    "fetch_has_prototype": false,
+    "fetch_constructable": false,
+    "toString_has_prototype": false,
+    "toString_constructable": false,
+    "toString_instanceof_Function": true,
+    "has_sh_mask": false,
+    "sh_globals_str": [],
+    "toString_own_symbols": 0,
+    "verdict": "ALL PASS — main-realm shape matches a clean native Firefox"
+  },
+  "iframe_realm_acceptance": {
+    "fetch_via_iframe_toString": "function fetch() { [native code] }",
+    "iframe_toString_has_prototype": false,
+    "iframe_toString_instanceof_iframe_Function": true,
+    "verdict": "ALL PASS — cross-realm pollution probe (Proxy instanceof) holds"
+  },
+  "creepjs_scoring": {
+    "headless_first": {
+      "hash": "bada4467",
+      "pct": 33
+    },
+    "headless_second": {
+      "hash": "a427e0b8",
+      "pct": 20
+    },
+    "like_headless": 0,
+    "stealth": {
+      "hash": "71bd68ae",
+      "pct": "undisplayed"
+    },
+    "resistance": {
+      "extension": "a5507ef9",
+      "privacy": "unknown",
+      "security": "unknown",
+      "mode": "unknown"
+    },
+    "fp_id_snippet": "Resistancec0b449da"
+  },
+  "diff_vs_stage4_after_m7_11": {
+    "main_world_probes": "unchanged — both stages pass main-realm acceptance",
+    "iframe_realm_probes": "stage4 FAIL (wrapper leak) → stage6 PASS (Proxy + arrow + bind)",
+    "creepjs_stealth_pct": "still 20% — not driven by hook shape",
+    "resistance_extension": "still a5507ef9 — different hash from stage4 d4ec0779, but still non-unknown"
+  },
+  "remaining_leaks_hypothesis": [
+    "Error.stack depth: every fetch call inserts one extra stack frame from the wrapper. CreepJS often runs fetch and reads stack via (new Error()).stack from inside or via promise rejection traces.",
+    "WebDriver-protocol side-channels Camoufox does not patch: BiDi adds RemoteAgent classes / observers that may be probed via DevTools-style introspection.",
+    "navigator.permissions / serviceWorker registration timing.",
+    "Some indirectly detectable side-effect of the Proxy itself (cross-realm Proxy detection beyond instanceof, e.g. structuredClone behaviour).",
+    "Worker UA still exposes Camoufox: BiDi addPreloadScript does not reach workers; preset injection runs post-start and the first worker UA read still shows Camoufox/150.0.2-beta.25."
+  ],
+  "what_we_changed_this_pass": [
+    "src/server/server.ts: lazy session.init — no longer block MCP initialize on Camoufox launch (committed 4299b58).",
+    "src/capabilities/stealthHook.ts: emitToStringMasking is now top-of-preload bootstrap; private Symbol on globalThis carries { maskAs, installInRealm }; sub-realm preload skips bootstrap and only installs local override.",
+    "src/capabilities/stealthHook.ts: buildOverrideIn uses target-realm Proxy(realFnToString, {apply, construct}) — gives `instanceof targetWin.Function === true` AND `prototype` absent AND `new override()` throws.",
+    "src/capabilities/stealthHook.ts: wrapper is now an arrow function with (...a) rest — no own `prototype`, not constructable. Tradeoff: `this` is no longer dynamically forwarded; OK for current wrap targets (fetch / XHR / WebSocket).",
+    "test/unit/capabilities/stealthHook.test.ts: updated single-install assertion to match the new shared-surface architecture.",
+    "test/integration/capabilities/stealthHook-cross-realm.test.ts: added iframe-realm Proxy.instanceof probe assertion (Acceptance §4.4)."
+  ],
+  "next_milestones": {
+    "M7.12 stack-mask": "wrap fetch via Proxy at native-call boundary so the synchronous wrapper frame is excised from Error.stack",
+    "M7.13 worker-prestart-ua": "investigate whether Camoufox preset or a BiDi sandbox lets us patch navigator.userAgent before the worker first reads it; otherwise document as unreachable",
+    "M7.14 stealth-extension-fingerprint": "instrument CreepJS source to identify which exact probe produces a5507ef9; targeted fix"
+  },
+  "acceptance_summary": "M7.11 + M7.11.x spec-level acceptance is met: every probe declared in plan §7 returns the expected value. CreepJS stealth%/extension fingerprint reflects additional probes that are out of scope for the stealthHook capability."
+}

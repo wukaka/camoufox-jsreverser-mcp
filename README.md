@@ -38,8 +38,6 @@
 
 我们的 `inject_stealth_hook` 已经把 Hook 表面清理干净（Function.toString 伪装、跨 realm 探针、零全局变量——证据见 `stealth-evidence/SUMMARY.md` stage 6），但它**有意止步于 Hook 边界**。引擎级信号（`navigator.webdriver`、Canvas 噪声、GPU 字符串）按设计不在其能力范围内。
 
-**一句话总结**：如果只是本地调试和逆向，原版 Firefox 够用——加 `--stealth=off` 用那 80% 与引擎无关的工具即可；如果目标是绕过反爬或商业指纹系统，**必须用 Camoufox**，原版 Firefox 在 C++ 补丁这一层无法补齐。后续加 `--engine=firefox|camoufox` 开关在技术上可行，但 stealth 面在 raw-Firefox 路径下必须显式宣告自身不可用。
-
 ## 安装
 
 需要 Node.js 20+。

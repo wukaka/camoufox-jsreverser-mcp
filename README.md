@@ -70,13 +70,43 @@ Not regularly verified. Install Camoufox from the [Camoufox releases](https://gi
 
 `--stealth=auto` (default) installs the `firefox-default` preload payload from `src/stealth-scripts/` during session init. `--stealth=off` skips the preload only — Camoufox's C++ stealth layer is always on regardless of this flag.
 
-## Configure
+## Register with an MCP client
 
-Copy `.env.example` to `.env` and fill in what you need:
+This server is meant to be driven by an AI agent — Claude Code, Claude Desktop, Cursor, etc. Running it standalone from a shell isn't a real reverse-engineering workflow; the only reason to do that is to verify the install works (see [Smoke-test](#smoke-test-the-install) below).
+
+### Claude Code (CLI)
 
 ```bash
-cp .env.example .env
+# from this repo (so the build path resolves correctly)
+claude mcp add camoufox-jsreverser \
+  --env LLM_PROVIDER=openai \
+  --env LLM_API_KEY=sk-... \
+  --env GECKODRIVER_PATH=/opt/homebrew/bin/geckodriver \
+  -- node "$(pwd)/build/src/index.js" --stealth=auto
 ```
+
+Or edit `~/.claude.json` directly:
+
+```jsonc
+{
+  "mcpServers": {
+    "camoufox-jsreverser": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/camoufox-jsreverser-mcp/build/src/index.js",
+        "--stealth=auto"
+      ],
+      "env": {
+        "LLM_PROVIDER": "openai",
+        "LLM_API_KEY": "sk-...",
+        "GECKODRIVER_PATH": "/opt/homebrew/bin/geckodriver"
+      }
+    }
+  }
+}
+```
+
+The `env` block is the only configuration path the agent needs. Variables:
 
 | Variable | Used for |
 |---|---|
@@ -89,27 +119,27 @@ cp .env.example .env
 
 `understand_code`, `summarize_code` and `deobfuscate_code` (LLM post-processing) return `LlmNotConfigured` cleanly when no provider is configured — never throw — so the rest of the tool surface stays usable without an LLM key.
 
-## Run
+### CLI flags
 
-```bash
-# Launch a fresh Firefox + MCP server over stdio
-node build/src/index.js --stealth=auto
-
-# Or attach to an already-running geckodriver session
-node build/src/index.js --attach --bidi-url ws://... --rdp-port 6000
-```
-
-CLI flags:
+The MCP client passes these through `args`. The flags worth knowing:
 
 | Flag | Meaning |
 |---|---|
-| `--attach` | Skip launching Camoufox; use `--bidi-url` + `--rdp-port`. |
-| `--bidi-url <ws>` | WebDriver BiDi WebSocket URL (attach mode). |
-| `--rdp-port <port>` | Firefox RDP TCP port. Required in attach mode; auto-allocated in launch mode. |
+| `--stealth <auto\|off>` | Apply the `firefox-default` preload on init (default `auto`). Does NOT control the always-on Camoufox C++ stealth. |
+| `--user-agent <ua>` | Override the leaky `Camoufox/<ver>` UA brand on the launched profile. |
 | `--camoufox-path <path>` | Override Camoufox binary (defaults to `CAMOUFOX_PATH` or the macOS path above). |
 | `--geckodriver-path <path>` | Override geckodriver binary (defaults to `GECKODRIVER_PATH` or `/usr/local/bin/geckodriver`). |
-| `--user-agent <ua>` | Override the leaky `Camoufox/<ver>` UA brand on the launched profile. |
-| `--stealth <auto\|off>` | Apply the `firefox-default` preload on init (default `auto`). Does NOT control the always-on Camoufox C++ stealth. |
+| `--attach`, `--bidi-url <ws>`, `--rdp-port <port>` | Attach to an already-running geckodriver session instead of launching one. Developer / debug use. |
+
+## Smoke-test the install
+
+To confirm the server boots and an MCP client can talk to it, run it once by hand:
+
+```bash
+node build/src/index.js --stealth=auto
+```
+
+It will speak MCP over stdio. A successful boot prints no banner — silence is correct. Hit Ctrl-C to exit. Local-only env overrides for this shell-launched mode can be put in a `.env` file at the repo root (`cp .env.example .env`); the MCP-client `env` block takes precedence over `.env`, which takes precedence over… nothing. Day-to-day configuration should live in the client.
 
 ## Stealth tools
 

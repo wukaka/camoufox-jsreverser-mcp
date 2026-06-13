@@ -30,11 +30,35 @@ driver → capability → session → tool
 - **Tools**: thin wrappers that read inputs, call one capability, return a
   `ToolResult` (`ok=true` + data, or `ok=false` + ErrorReason).
 
+## Why Camoufox (and not raw Firefox)
+
+Roughly 80% of the toolset — debugger / scripts / DOM / network / hooks / AST / LLM — is **browser-binary agnostic**. It talks WebDriver BiDi and the Firefox Remote Debugging Protocol, both of which raw Firefox 150 also speaks. So why pin to Camoufox? Because the remaining 20% — the anti-detection surface — needs **C++-level patches that no preload script can recreate**.
+
+The split looks like this:
+
+| Layer | Where it lives | Raw Firefox | Camoufox |
+|---|---|---|---|
+| Debugger / scripts / DOM / network / hooks / AST / LLM tools | TypeScript over BiDi + RDP | ✅ works | ✅ works |
+| `inject_stealth_hook` cross-realm Function.prototype.toString masking | TypeScript preload | ✅ works | ✅ works |
+| `navigator.webdriver === false` | C++ binary patch | ❌ stuck `true` (the getter is non-configurable) | ✅ patched |
+| `navigator.plugins` / `mimeTypes` realistic shape | C++ injection | ❌ empty / short | ✅ realistic |
+| WebGL vendor / renderer spoof | C++ override | ❌ leaks real GPU or `"Mozilla"` | ✅ spoofed |
+| Canvas 2D / AudioContext per-pixel / per-sample noise | C++ injection | ❌ stable fingerprint | ✅ noised |
+| Font enumeration spoof | C++ table swap | ❌ real installed fonts | ✅ spoofed |
+| WebDriver-protocol side-channels (RemoteAgent class, Marionette artefacts) | C++ removal | ❌ present and probeable | ✅ scrubbed |
+| `Camoufox/<ver>` UA brand leak | string concern | n/a | spoofable via `set_user_agent` |
+
+Result: **on raw Firefox, `navigator.webdriver === true` alone disqualifies the session against CreepJS / sannysoft / commercial anti-bot scoring** before any of our preload work even runs. A TypeScript preload can `Object.defineProperty(navigator, 'webdriver', ...)` in the main world but not in workers, iframes, or privileged pages — and on Firefox 150 the `webdriver` accessor's property descriptor is locked, so the redefine attempt throws. A `Proxy` wrap of `navigator` reads in main world is observable to anything that compares `navigator === window.navigator.constructor.prototype.constructor`.
+
+Our `inject_stealth_hook` cleans up the hook surface (Function.toString masking, cross-realm probes, no globals — see `stealth-evidence/SUMMARY.md` stage 6) but it deliberately stops at the hook boundary. Engine-level signals (`navigator.webdriver`, Canvas noise, GPU strings) are out of its scope by design.
+
+**Bottom line.** If your target is local debugging and reverse engineering, raw Firefox is fine — disable `--stealth` and use the 80% of the toolchain that is engine-neutral. If your target is anti-bot resistant scraping or evading commercial fingerprinters, Camoufox is required; raw Firefox cannot reach feature parity at the C++ patches we need. Adding a `--engine=firefox|camoufox` switch is feasible but the stealth surface would have to declare itself disabled on the raw-Firefox path.
+
 ## Install
 
 Requires Node.js 20+.
 
-**Supported browser stack: Camoufox + geckodriver only.** Raw `firefox --remote-debugging-port` exposes CDP, not WebDriver BiDi, and is not supported. Camoufox provides C++-level anti-detection (navigator.webdriver=false, fingerprint patches) that the in-tree `firefox-default` preload payload layers on top of.
+**Supported browser stack: Camoufox + geckodriver only.** Raw `firefox --remote-debugging-port` exposes CDP, not WebDriver BiDi, and is not supported — and the stealth half of the toolchain only works against Camoufox (see [Why Camoufox](#why-camoufox-and-not-raw-firefox)).
 
 ### macOS
 

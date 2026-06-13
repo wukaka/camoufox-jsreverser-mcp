@@ -1,4 +1,4 @@
-# js-reverse-firefox
+# camoufox-jsreverser-mcp
 
 Front-end JavaScript reverse-engineering MCP server for Firefox, backed by WebDriver BiDi
 and the Firefox Remote Debugging Protocol (RDP).

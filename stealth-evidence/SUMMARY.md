@@ -1,6 +1,6 @@
 # 反检测实测报告 — 2026-06-12
 
-测试栈：Camoufox 150.0.2-beta.25 + geckodriver + firefox-js-reverse-mcp（master @ 0858f66）
+测试栈：Camoufox 150.0.2-beta.25 + geckodriver + camoufox-jsreverser-mcp（master @ 0858f66）
 
 ## 阶段 1 — bot.sannysoft.com 基线
 
@@ -51,7 +51,7 @@
 
 1. **Camoufox 基线已足够好对付主流 sannysoft / 基础反爬检测**（HEADCHR/CHR/SELENIUM 全过）。
 2. **`navigator.webdriver` 主世界 = false** 在主流页面表现稳定。
-3. `firefox-js-reverse-mcp` 的 `inject_stealth_to_workers` 与 `inject_stealth_hook` 工具链可正常工作（preload ID 落地、watch 订阅生效）。
+3. `camoufox-jsreverser-mcp` 的 `inject_stealth_to_workers` 与 `inject_stealth_hook` 工具链可正常工作（preload ID 落地、watch 订阅生效）。
 
 ### 暴露的弱点
 
@@ -77,7 +77,7 @@
 
 ## M7.11 验证（2026-06-12 续）
 
-测试栈：Camoufox 150.0.2-beta.25 + geckodriver + firefox-js-reverse-mcp @ `4299b58`（feat/m7.11-stealth-hook-v2 分支 8 个 commit）
+测试栈：Camoufox 150.0.2-beta.25 + geckodriver + camoufox-jsreverser-mcp @ `4299b58`（feat/m7.11-stealth-hook-v2 分支 8 个 commit）
 
 ### 阶段 3-after-m7.11 — CreepJS 基线（无 hook，M7.11 build）
 

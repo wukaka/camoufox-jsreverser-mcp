@@ -4,7 +4,7 @@
 |---|---|
 | Spec 日期 | 2026-06-09 |
 | 项目名 | JSReverser-Firefox-MCP |
-| npm 包名 | js-reverse-firefox |
+| npm 包名 | camoufox-jsreverser-mcp |
 | 运行时 | Node.js 20+ |
 | 主语言 | TypeScript |
 | 源参考 | https://github.com/lwjjike/JSReverser-Strong-MCP (Chrome CDP 版) |
@@ -665,7 +665,7 @@ Firefox 二进制：CI 用 `browser-actions/setup-firefox` 装；本地用 `FIRE
 ### 7.1 启动参数
 
 ```
-js-reverse-firefox \
+camoufox-jsreverser-mcp \
   [--bidi-url ws://127.0.0.1:9222/...] \
   [--rdp-port 6000] \
   [--attach] \
@@ -679,7 +679,7 @@ js-reverse-firefox \
 ### 7.2 codex MCP 配置
 
 ```toml
-[mcp_servers.js-reverse-firefox]
+[mcp_servers.camoufox-jsreverser-mcp]
 command = "node"
 args = ["你本地路径/JSReverser-Firefox-MCP/build/src/index.js"]
 ```

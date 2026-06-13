@@ -1,10 +1,10 @@
 {
-  "name": "js-reverse-firefox",
+  "name": "camoufox-jsreverser-mcp",
   "version": "0.1.0",
   "description": "JSReverser-Firefox-MCP: front-end JS reverse engineering MCP for Firefox via WebDriver BiDi + RDP",
   "type": "module",
   "bin": {
-    "js-reverse-firefox": "./build/src/index.js"
+    "camoufox-jsreverser-mcp": "./build/src/index.js"
   },
   "main": "./build/src/index.js",
   "scripts": {

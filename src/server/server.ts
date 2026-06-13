@@ -17,7 +17,7 @@ export async function startServer(
   tools: ToolDefinition<any, any>[],
   options: StartServerOptions = {},
 ): Promise<void> {
-  const srv = new Server({ name: 'js-reverse-firefox', version: '0.1.0' }, { capabilities: { tools: {} } });
+  const srv = new Server({ name: 'camoufox-jsreverser-mcp', version: '0.1.0' }, { capabilities: { tools: {} } });
 
   let initPromise: Promise<void> | null = null;
   const ensureInit = options.ensureInit

@@ -16,6 +16,7 @@ CLAUDE.local.md
 .cursor/
 .cursorrules
 .windsurf/
+CLAUDE.md
 
 # claude code plugins
 docs/superpowers/
@@ -23,10 +24,13 @@ docs/superpowers/
 # Test / build caches
 .vitest/
 .vitest-cache/
+vitest.*
+
 .cache/
 .turbo/
 .tsbuildinfo
 *.tsbuildinfo
 .eslintcache
 .npm/
-
+.env/
+.env.example

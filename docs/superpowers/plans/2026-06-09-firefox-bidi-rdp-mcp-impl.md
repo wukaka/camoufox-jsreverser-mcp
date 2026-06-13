@@ -147,7 +147,7 @@ README.md
 - [ ] **Step 1: Init package**
 
 ```bash
-cd /Users/apple/Downloads/firefox-js-reverse-mcp
+cd /Users/apple/Downloads/camoufox-jsreverser-mcp
 npm init -y
 ```
 
@@ -155,12 +155,12 @@ npm init -y
 
 ```json
 {
-  "name": "js-reverse-firefox",
+  "name": "camoufox-jsreverser-mcp",
   "version": "0.1.0",
   "description": "JSReverser-Firefox-MCP: front-end JS reverse engineering MCP for Firefox via WebDriver BiDi + RDP",
   "type": "module",
   "bin": {
-    "js-reverse-firefox": "./build/src/index.js"
+    "camoufox-jsreverser-mcp": "./build/src/index.js"
   },
   "main": "./build/src/index.js",
   "scripts": {
@@ -320,7 +320,7 @@ FIREFOX_PATH=
 ```bash
 git init
 git add .
-git commit -m "chore: scaffold js-reverse-firefox project (M1.01)"
+git commit -m "chore: scaffold camoufox-jsreverser-mcp project (M1.01)"
 ```
 
 ### Task M1.02: ToolResult type + ErrorReason enum
@@ -2101,7 +2101,7 @@ import { ToolDefinition, executeTool } from './tool-registry.js';
 import { Session } from '../session/Session.js';
 
 export async function startServer(session: Session, tools: ToolDefinition<any, any>[]): Promise<void> {
-  const srv = new Server({ name: 'js-reverse-firefox', version: '0.1.0' }, { capabilities: { tools: {} } });
+  const srv = new Server({ name: 'camoufox-jsreverser-mcp', version: '0.1.0' }, { capabilities: { tools: {} } });
 
   srv.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map(t => ({

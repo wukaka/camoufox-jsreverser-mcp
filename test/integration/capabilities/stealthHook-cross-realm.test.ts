@@ -83,6 +83,33 @@ describe('capability: stealthHook cross-realm (live M7.11)', () => {
         Object.getOwnPropertySymbols(Function.prototype.toString).length
       `);
       expect((probe3.result as { value?: number }).value).toBe(0);
+
+      // 4. CreepJS cross-realm-pollution probe: an iframe's
+      //    Function.prototype.toString MUST be an instance of that iframe's
+      //    Function (i.e. its [[Prototype]] is the iframe-realm Function.prototype,
+      //    not the top realm's). M7.11.x ensures this by building the override
+      //    via the target realm's Function constructor.
+      const probe4 = await sHost.evaluate(realm.realmId, `
+        (function () {
+          var iframes = document.querySelectorAll('iframe');
+          var out = [];
+          for (var i = 0; i < iframes.length; i++) {
+            var cw = iframes[i].contentWindow;
+            out.push({
+              id: iframes[i].id,
+              ts_instanceof_iframe_Function: cw.Function.prototype.toString instanceof cw.Function,
+              ts_instanceof_top_Function: cw.Function.prototype.toString instanceof Function,
+            });
+          }
+          return JSON.stringify(out);
+        })()
+      `);
+      const probe4Val = (probe4.result as { value?: string }).value ?? '[]';
+      const rows4: Array<{ id: string; ts_instanceof_iframe_Function: boolean; ts_instanceof_top_Function: boolean }> =
+        JSON.parse(probe4Val);
+      for (const row of rows4) {
+        expect(row.ts_instanceof_iframe_Function).toBe(true);
+      }
     } finally {
       await pi.remove(preloadId);
     }

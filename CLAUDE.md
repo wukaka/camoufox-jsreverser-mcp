@@ -4,6 +4,29 @@ Firefox 150 JavaScript reverse-engineering MCP server. Backed by WebDriver BiDi 
 
 If you are a coding agent opening this repo cold, read this file first. It is the single curated entry point into the codebase.
 
+## Scope: what this toolset can and cannot do
+
+This is a **mid-to-low intensity** JS reverse-engineering toolset. Be honest with users about the ceiling before starting any reverse task.
+
+**Works well for:**
+- Conventional request-signing parameters (timestamp + nonce + HMAC/AES/RC4/SM4 via CryptoJS or similar standard libs)
+- Lightly obfuscated code (sojson, jsobfuscator, basic string-table + variable-renaming) — `deobfuscate_code` + `understand_code` reliably recover semantics
+- Webpack chunk analysis, runtime hook capture, WebSocket / XHR protocol reverse
+- Cookie / login-state / session-state replay where the algorithm is plain-JS (not VMP-encoded)
+- AST-driven extraction of pure algorithms once the input surface is known
+
+**Does NOT work (and no amount of protocol switching fixes it):**
+- **Rui Shu 5/6 (瑞数), 顶象 VMP, 极验 VMP, 阿里 240, 网易易盾 deep mode** — these encode the entire algorithm as bytecode for a self-implemented stack VM. BiDi+RDP can attach, hook, and trace — but the call stack only points at the VM's opcode dispatch loop, which carries no algorithmic information. The semantic layer is invisible.
+- Heavy use of `new Function()` / `eval()` to generate second-stage code dynamically — current tools cannot reliably follow this without a VMP-aware tracer.
+
+**When you detect VMP-class targets** (markers: `if($_ts.cd){...}`, `while(1){opcode = bytes[ip++]; if (opcode < N){...}}` dispatch loops, byte arrays > 5KB at file tail, high-codepoint Unicode "instruction string" regions, dynamic `Function` constructors as the only call into the next layer), **stop and tell the user**:
+
+> Target uses a VMP-class anti-bot system. Pure-algorithm offline reproduction in Node/Python is a 6–12 month research project, not a feasible workflow with this toolset. Recommended path: browser-automation proxy (Camoufox/Playwright) with fingerprint hardening, not algorithm extraction.
+
+Breaking VMP requires a separate technology stack (opcode-table dumper, IR rewriting, symbolic execution, full trace recording + offline replay) that this project does not implement. Don't waste hours hooking against VMP — the call frames have no information to give you.
+
+A worked example of hitting this ceiling lives in `artifacts/tasks/etax-cookie-2026-06-15/report.md` (Rui Shu 5代 case on `etax.chinatax.gov.cn`).
+
 ## Quick start
 
 ```bash
